@@ -1,49 +1,121 @@
 /**
- * SafeScan — Scan Tab (with real icons)
+ * SafeScan — Scan Tab
+ * 
+ * Main scan screen — live camera capture with overlay + gallery upload option.
  */
 
-import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native';
+import { useState, useRef } from 'react';
+import { View, Text, Pressable, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { CameraView } from 'expo-camera';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { useScanStore } from '../../stores/useScanStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useRouter } from 'expo-router';
+import { useCamera } from '../../hooks/useCamera';
+import { useImagePicker } from '../../hooks/useImagePicker';
+import { needsCompression, compressImage } from '../../utils/imageHelpers';
 
 const { width } = Dimensions.get('window');
 
 export default function ScanScreen() {
   const { user } = useAuthStore();
-  const { phase, setCapturedImage, startScan } = useScanStore();
+  const { setCapturedImage, startScan } = useScanStore();
   const router = useRouter();
+  
+  const cameraRef = useRef<CameraView>(null);
+  const { hasPermission, checkAndRequestPermission, isPending } = useCamera();
+  const { pickImage, isPicking } = useImagePicker();
+  
+  const [isCapturing, setIsCapturing] = useState(false);
 
-  const handleTakePhoto = () => {
-    handlePickImage();
+  const processAndUpload = async (uri: string) => {
+    if (!user) return;
+    
+    try {
+      setCapturedImage(uri);
+      
+      // Check if compression is needed (mock for now, returns original URI)
+      const needsComp = await needsCompression(uri);
+      const processedUri = needsComp ? await compressImage(uri) : uri;
+      
+      const fileName = `scan_${Date.now()}.jpg`;
+      const reportId = await startScan(user.$id, processedUri, fileName);
+      router.push(`/report/${reportId}`);
+    } catch (err) {
+      console.error('Failed to process image:', err);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    if (!cameraRef.current || isCapturing) return;
+    
+    try {
+      setIsCapturing(true);
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.8,
+        skipProcessing: false,
+      });
+      
+      if (photo?.uri) {
+        await processAndUpload(photo.uri);
+      }
+    } catch (err) {
+      console.error('Failed to take photo:', err);
+    } finally {
+      setIsCapturing(false);
+    }
   };
 
   const handlePickImage = async () => {
-    try {
-      const ImagePicker = require('expo-image-picker');
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.8,
-        allowsEditing: true,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        const asset = result.assets[0];
-        setCapturedImage(asset.uri);
-
-        if (user) {
-          const fileName = asset.fileName || `scan_${Date.now()}.jpg`;
-          const reportId = await startScan(user.$id, asset.uri, fileName);
-          router.push(`/report/${reportId}`);
-        }
-      }
-    } catch (err) {
-      console.error('Image picker error:', err);
+    if (isPicking) return;
+    const uri = await pickImage();
+    if (uri) {
+      await processAndUpload(uri);
     }
   };
+
+  // If permissions are pending
+  if (isPending) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={Colors.accent.primary} />
+          <Text style={styles.loadingText}>Initializing camera...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // If permission denied
+  if (hasPermission === false) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.centerContent}>
+          <Ionicons name="camera-outline" size={48} color={Colors.status.concern} />
+          <Text style={styles.errorTitle}>Camera Access Denied</Text>
+          <Text style={styles.errorSubtitle}>
+            We need camera access to scan product labels.
+          </Text>
+          <Pressable style={styles.permissionButton} onPress={checkAndRequestPermission}>
+            <Text style={styles.permissionButtonText}>Grant Permission</Text>
+          </Pressable>
+          
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+          
+          <Pressable style={styles.secondaryButton} onPress={handlePickImage}>
+            <Ionicons name="images-outline" size={24} color={Colors.text.secondary} />
+            <Text style={styles.secondaryLabel}>Choose from Gallery instead</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -61,21 +133,22 @@ export default function ScanScreen() {
         </Text>
       </View>
 
-      {/* Camera viewport placeholder */}
+      {/* Camera viewport */}
       <View style={styles.viewfinderContainer}>
         <View style={styles.viewfinder}>
-          {/* Corner guides */}
-          <View style={[styles.corner, styles.cornerTL]} />
-          <View style={[styles.corner, styles.cornerTR]} />
-          <View style={[styles.corner, styles.cornerBL]} />
-          <View style={[styles.corner, styles.cornerBR]} />
-
-          {/* Center content */}
-          <View style={styles.viewfinderContent}>
-            <View style={styles.scanIconWrapper}>
-              <Ionicons name="scan-outline" size={48} color={Colors.accent.primaryLight} />
-            </View>
-            <Text style={styles.viewfinderText}>Position the ingredient list{'\n'}within the frame</Text>
+          <CameraView 
+            ref={cameraRef}
+            style={StyleSheet.absoluteFillObject}
+            facing="back"
+          />
+          
+          {/* Overlay mask */}
+          <View style={styles.overlayMask}>
+            {/* Corner guides */}
+            <View style={[styles.corner, styles.cornerTL]} />
+            <View style={[styles.corner, styles.cornerTR]} />
+            <View style={[styles.corner, styles.cornerBL]} />
+            <View style={[styles.corner, styles.cornerBR]} />
           </View>
         </View>
 
@@ -99,21 +172,30 @@ export default function ScanScreen() {
       {/* Action buttons */}
       <View style={styles.actions}>
         <Pressable
-          style={({ pressed }) => [styles.captureButton, pressed && styles.captureButtonPressed]}
+          style={({ pressed }) => [
+            styles.captureButton, 
+            (pressed || isCapturing) && styles.captureButtonPressed
+          ]}
           onPress={handleTakePhoto}
+          disabled={isCapturing}
         >
           <View style={styles.captureButtonInner}>
-            <Ionicons name="camera" size={28} color={Colors.white} />
+            {isCapturing ? (
+              <ActivityIndicator size="small" color={Colors.white} />
+            ) : (
+              <Ionicons name="camera" size={28} color={Colors.white} />
+            )}
           </View>
         </Pressable>
 
         <View style={styles.secondaryActions}>
           <Pressable
-            style={({ pressed }) => [styles.secondaryButton, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.secondaryButtonAction, pressed && { opacity: 0.7 }]}
             onPress={handlePickImage}
+            disabled={isCapturing || isPicking}
           >
             <Ionicons name="images-outline" size={24} color={Colors.text.secondary} />
-            <Text style={styles.secondaryLabel}>Gallery</Text>
+            <Text style={styles.secondaryLabelAction}>Gallery</Text>
           </Pressable>
         </View>
       </View>
@@ -126,6 +208,70 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background.primary,
     paddingHorizontal: Spacing.lg,
+  },
+  centerContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing['2xl'],
+  },
+  loadingText: {
+    color: Colors.text.secondary,
+    fontSize: Typography.fontSize.base,
+  },
+  errorTitle: {
+    fontSize: Typography.fontSize.xl,
+    fontWeight: '700',
+    color: Colors.text.primary,
+  },
+  errorSubtitle: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.text.tertiary,
+    textAlign: 'center',
+  },
+  permissionButton: {
+    backgroundColor: Colors.accent.primary,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.lg,
+  },
+  permissionButtonText: {
+    color: Colors.white,
+    fontWeight: '600',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    marginVertical: Spacing.xl,
+    width: '100%',
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border.default,
+  },
+  dividerText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.text.tertiary,
+  },
+  secondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.glass.background,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.glass.border,
+  },
+  secondaryLabel: {
+    fontSize: Typography.fontSize.base,
+    color: Colors.text.secondary,
+    fontWeight: '500',
   },
   header: {
     paddingTop: Spacing.base,
@@ -170,6 +316,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
+  overlayMask: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+    borderWidth: 40,
+    borderColor: 'rgba(10, 14, 26, 0.4)', // Dark overlay around the edges
+    borderRadius: BorderRadius['2xl'],
+  },
   corner: {
     position: 'absolute',
     width: 30,
@@ -203,24 +356,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 3,
     borderRightWidth: 3,
     borderBottomRightRadius: 8,
-  },
-  viewfinderContent: {
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  scanIconWrapper: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.glass.backgroundHover,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  viewfinderText: {
-    textAlign: 'center',
-    color: Colors.text.tertiary,
-    fontSize: Typography.fontSize.sm,
-    lineHeight: 20,
   },
   tipsRow: {
     flexDirection: 'row',
@@ -273,11 +408,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.xl,
   },
-  secondaryButton: {
+  secondaryButtonAction: {
     alignItems: 'center',
     gap: 4,
   },
-  secondaryLabel: {
+  secondaryLabelAction: {
     fontSize: Typography.fontSize.xs,
     color: Colors.text.secondary,
   },
