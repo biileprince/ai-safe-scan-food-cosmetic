@@ -30,7 +30,7 @@ export default function ReportScreen() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
 
     const fetchReport = async () => {
       try {

@@ -33,7 +33,7 @@ export default function RootLayout() {
     if (isAuthenticated && user) {
       // Ensure profile exists, then redirect to main app
       ensureProfile(user.$id, user.name);
-      if (inAuthGroup || segments.length === 0) {
+      if (inAuthGroup || !segments.length) {
         router.replace('/(tabs)/scan');
       }
     } else {
@@ -48,7 +48,7 @@ export default function RootLayout() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.accent.primary} />
+        <ActivityIndicator size="large" color={Colors.primary[600]} />
         <StatusBar style="light" />
       </View>
     );

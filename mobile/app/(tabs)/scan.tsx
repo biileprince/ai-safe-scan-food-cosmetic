@@ -109,7 +109,7 @@ export default function ScanScreen() {
         <View style={styles.cameraView}>
           <CameraView
             ref={cameraRef}
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
             facing="back"
           />
           {/* Corner guides */}
