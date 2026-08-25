@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border.subtle,
   },
   rowPressed: {
-    backgroundColor: Colors.glass.backgroundHover,
+    backgroundColor: Colors.gray[50],
   },
   statusDot: {
     width: 32,
@@ -139,13 +139,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: Colors.glass.background,
+    backgroundColor: Colors.gray[50],
     borderRadius: BorderRadius.sm,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
   benefitChip: {
-    backgroundColor: Colors.status.favorableDim,
+    backgroundColor: Colors.status.favorableBg,
   },
   allergenChip: {
     backgroundColor: Colors.semantic.allergenBg,

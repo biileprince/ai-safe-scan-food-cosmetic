@@ -45,9 +45,9 @@ export default function Button({
   };
 
   const variantStyles: Record<string, { bg: string; text: string; border?: string }> = {
-    primary: { bg: Colors.accent.primary, text: Colors.white },
-    secondary: { bg: Colors.glass.backgroundHover, text: Colors.text.primary },
-    outline: { bg: 'transparent', text: Colors.accent.primaryLight, border: Colors.accent.primary },
+    primary: { bg: Colors.primary[600], text: Colors.white },
+    secondary: { bg: Colors.gray[100], text: Colors.text.primary },
+    outline: { bg: 'transparent', text: Colors.primary[600], border: Colors.primary[600] },
     danger: { bg: Colors.semantic.riskBg, text: Colors.status.concern, border: Colors.status.concern },
     ghost: { bg: 'transparent', text: Colors.text.secondary },
   };

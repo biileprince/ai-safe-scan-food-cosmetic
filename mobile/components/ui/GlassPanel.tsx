@@ -24,9 +24,9 @@ export default function GlassPanel({ children, style, noPadding }: GlassPanelPro
 
 const styles = StyleSheet.create({
   panel: {
-    backgroundColor: Colors.glass.background,
+    backgroundColor: Colors.white,
     borderWidth: 1,
-    borderColor: Colors.glass.border,
+    borderColor: Colors.border.default,
     borderRadius: BorderRadius.xl,
     overflow: 'hidden',
   },

@@ -78,12 +78,12 @@ export function SkeletonReportCard() {
 
 const styles = StyleSheet.create({
   skeleton: {
-    backgroundColor: Colors.glass.backgroundHover,
+    backgroundColor: Colors.gray[200],
   },
   card: {
-    backgroundColor: Colors.glass.background,
+    backgroundColor: Colors.white,
     borderWidth: 1,
-    borderColor: Colors.glass.border,
+    borderColor: Colors.border.default,
     borderRadius: BorderRadius.lg,
     padding: 16,
     gap: 12,

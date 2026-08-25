@@ -14,7 +14,7 @@ const VIEWFINDER_SIZE = width - 80;
 
 export default function CameraOverlay() {
   return (
-    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {/* Corner guides */}
       <View style={[styles.corner, styles.cornerTL]} />
       <View style={[styles.corner, styles.cornerTR]} />
@@ -23,7 +23,7 @@ export default function CameraOverlay() {
 
       {/* Center label guide */}
       <View style={styles.guideLabelWrap}>
-        <Ionicons name="scan-outline" size={20} color={Colors.accent.primaryLight} />
+        <Ionicons name="scan-outline" size={20} color={Colors.primary[300]} />
         <Text style={styles.guideText}>Align ingredient list here</Text>
       </View>
     </View>
@@ -35,7 +35,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 30,
     height: 30,
-    borderColor: Colors.accent.primary,
+    borderColor: Colors.primary[500],
   },
   cornerTL: {
     top: 20,

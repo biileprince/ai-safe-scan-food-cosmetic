@@ -57,7 +57,7 @@ export default function ScanProgress({ currentStep }: ScanProgressProps) {
         <MaterialCommunityIcons
           name="flask-round-bottom"
           size={40}
-          color={Colors.accent.primaryLight}
+          color={Colors.primary[300]}
         />
       </View>
 
@@ -80,7 +80,7 @@ export default function ScanProgress({ currentStep }: ScanProgressProps) {
             {step.status === 'completed' ? (
               <Ionicons name="checkmark-circle" size={20} color={Colors.status.favorable} />
             ) : step.status === 'active' ? (
-              <ActivityIndicator size="small" color={Colors.accent.primary} />
+              <ActivityIndicator size="small" color={Colors.primary[500]} />
             ) : (
               <Ionicons name="ellipse-outline" size={20} color={Colors.text.tertiary} />
             )}
@@ -109,9 +109,9 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: Colors.glass.background,
+    backgroundColor: Colors.gray[50],
     borderWidth: 1,
-    borderColor: Colors.glass.border,
+    borderColor: Colors.border.default,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.sm,

@@ -39,5 +39,6 @@ export async function uploadImage(uri: string, fileName: string): Promise<string
 }
 
 export function getImageUrl(fileId: string): string {
-  return storage.getFilePreview(BUCKET_ID, fileId).href;
+  // @ts-ignore - The SDK types might be wrong, getFilePreview returns a URL object.
+  return storage.getFilePreview(BUCKET_ID, fileId).href || storage.getFilePreview(BUCKET_ID, fileId);
 }

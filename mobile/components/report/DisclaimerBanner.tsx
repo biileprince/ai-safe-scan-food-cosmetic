@@ -32,7 +32,7 @@ export default function DisclaimerBanner({ compact = false }: DisclaimerBannerPr
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.glass.background,
+    backgroundColor: Colors.gray[100],
     borderRadius: BorderRadius.md,
     padding: Spacing.base,
     gap: Spacing.sm,
