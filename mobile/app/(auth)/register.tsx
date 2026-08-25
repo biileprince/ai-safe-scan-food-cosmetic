@@ -1,5 +1,5 @@
 /**
- * SafeScan — Register Screen (with real icons)
+ * SafeScan — Register Screen
  */
 
 import { useState } from 'react';
@@ -11,37 +11,33 @@ import { useAuthStore } from '../../stores/useAuthStore';
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { register, loginWithGoogle, loginWithApple, isLoading, error, clearError } = useAuthStore();
-
+  const { register } = useAuthStore();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [localError, setLocalError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleRegister = async () => {
-    setLocalError('');
-    if (!name.trim() || !email.trim() || !password.trim()) {
-      setLocalError('Please fill in all fields.');
+    if (!name || !email || !password) {
+      setError('Please fill in all fields.');
       return;
     }
     if (password.length < 8) {
-      setLocalError('Password must be at least 8 characters.');
+      setError('Password must be at least 8 characters.');
       return;
     }
-    if (password !== confirmPassword) {
-      setLocalError('Passwords do not match.');
-      return;
-    }
+    setIsLoading(true);
+    setError('');
     try {
-      await register(email.trim(), password, name.trim());
-    } catch {
-      // Error handled in store
+      await register(email, password, name);
+    } catch (err: any) {
+      setError(err?.message || 'Registration failed.');
+    } finally {
+      setIsLoading(false);
     }
   };
-
-  const displayError = localError || error;
 
   return (
     <KeyboardAvoidingView
@@ -51,38 +47,34 @@ export default function RegisterScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={20} color={Colors.text.primary} />
           </Pressable>
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Start scanning products for safety insights</Text>
+          <Text style={styles.title}>Create account</Text>
+          <Text style={styles.subtitle}>Start checking your products today</Text>
         </View>
 
-        {/* Form */}
         <View style={styles.form}>
-          {displayError ? (
+          {error ? (
             <View style={styles.errorBanner}>
-              <Ionicons name="alert-circle" size={18} color={Colors.status.concernLight} />
-              <Text style={styles.errorText}>{displayError}</Text>
-              <Pressable onPress={() => { clearError(); setLocalError(''); }}>
-                <Ionicons name="close" size={18} color={Colors.status.concernLight} />
-              </Pressable>
+              <Ionicons name="alert-circle" size={18} color={Colors.status.concern} />
+              <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Full Name</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="person-outline" size={18} color={Colors.text.tertiary} style={styles.inputIcon} />
+            <View style={styles.inputWrap}>
+              <Ionicons name="person-outline" size={18} color={Colors.gray[400]} />
               <TextInput
                 style={styles.input}
+                placeholder="John Doe"
+                placeholderTextColor={Colors.gray[400]}
                 value={name}
                 onChangeText={setName}
-                placeholder="Your name"
-                placeholderTextColor={Colors.text.tertiary}
                 autoCapitalize="words"
               />
             </View>
@@ -90,14 +82,14 @@ export default function RegisterScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Email</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="mail-outline" size={18} color={Colors.text.tertiary} style={styles.inputIcon} />
+            <View style={styles.inputWrap}>
+              <Ionicons name="mail-outline" size={18} color={Colors.gray[400]} />
               <TextInput
                 style={styles.input}
+                placeholder="you@example.com"
+                placeholderTextColor={Colors.gray[400]}
                 value={email}
                 onChangeText={setEmail}
-                placeholder="you@example.com"
-                placeholderTextColor={Colors.text.tertiary}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -107,90 +99,46 @@ export default function RegisterScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Password</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={18} color={Colors.text.tertiary} style={styles.inputIcon} />
+            <View style={styles.inputWrap}>
+              <Ionicons name="lock-closed-outline" size={18} color={Colors.gray[400]} />
               <TextInput
                 style={styles.input}
+                placeholder="Min. 8 characters"
+                placeholderTextColor={Colors.gray[400]}
                 value={password}
                 onChangeText={setPassword}
-                placeholder="Min. 8 characters"
-                placeholderTextColor={Colors.text.tertiary}
                 secureTextEntry={!showPassword}
               />
-              <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
-                <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={Colors.text.tertiary} />
+              <Pressable onPress={() => setShowPassword(!showPassword)}>
+                <Ionicons
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={18}
+                  color={Colors.gray[400]}
+                />
               </Pressable>
             </View>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Confirm Password</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={18} color={Colors.text.tertiary} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                placeholder="Re-enter your password"
-                placeholderTextColor={Colors.text.tertiary}
-                secureTextEntry={!showPassword}
-              />
-            </View>
-          </View>
-
           <Pressable
-            style={({ pressed }) => [styles.button, styles.buttonPrimary, pressed && styles.buttonPressed]}
+            style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed, isLoading && styles.buttonDisabled]}
             onPress={handleRegister}
             disabled={isLoading}
           >
-            {isLoading ? (
-              <Ionicons name="sync" size={20} color={Colors.white} />
-            ) : (
-              <Ionicons name="person-add-outline" size={20} color={Colors.white} />
-            )}
-            <Text style={styles.buttonText}>{isLoading ? 'Creating account…' : 'Create Account'}</Text>
+            <Text style={styles.primaryButtonText}>
+              {isLoading ? 'Creating account…' : 'Create Account'}
+            </Text>
           </Pressable>
 
-          {/* Divider */}
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* Social Auth */}
-          <Pressable
-            style={({ pressed }) => [styles.button, styles.buttonSocial, pressed && styles.buttonPressed]}
-            onPress={loginWithGoogle}
-            disabled={isLoading}
-          >
-            <Ionicons name="logo-google" size={20} color="#4285F4" />
-            <Text style={styles.socialButtonText}>Continue with Google</Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [styles.button, styles.buttonSocial, pressed && styles.buttonPressed]}
-            onPress={loginWithApple}
-            disabled={isLoading}
-          >
-            <Ionicons name="logo-apple" size={20} color={Colors.white} />
-            <Text style={styles.socialButtonText}>Continue with Apple</Text>
-          </Pressable>
+          <Text style={styles.terms}>
+            By creating an account, you agree to our Terms of Service and Privacy Policy.
+          </Text>
         </View>
 
-        {/* Footer */}
-        <Pressable onPress={() => router.push('/(auth)/login')} style={styles.footer}>
-          <Text style={styles.footerText}>
-            Already have an account? <Text style={styles.footerAccent}>Sign in</Text>
-          </Text>
-        </Pressable>
-
-        {/* Disclaimer */}
-        <View style={styles.disclaimerRow}>
-          <Ionicons name="information-circle-outline" size={14} color={Colors.text.tertiary} />
-          <Text style={styles.disclaimer}>
-            By creating an account, you agree that SafeScan provides informational assessments, not laboratory certification.
-          </Text>
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Already have an account?</Text>
+          <Pressable onPress={() => router.replace('/(auth)/login')}>
+            <Text style={styles.footerLink}>Sign In</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -204,156 +152,114 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: Spacing['2xl'],
-    paddingTop: 60,
-    paddingBottom: 40,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing['3xl'],
+    paddingBottom: Spacing['2xl'],
   },
   header: {
-    gap: Spacing.sm,
+    gap: Spacing.xs,
     marginBottom: Spacing['2xl'],
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.glass.background,
-    borderWidth: 1,
-    borderColor: Colors.glass.border,
+    backgroundColor: Colors.gray[100],
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.base,
   },
   title: {
-    fontSize: Typography.fontSize['3xl'],
-    fontWeight: '700',
+    fontSize: Typography.fontSize['2xl'],
+    fontWeight: Typography.fontWeight.heavy,
     color: Colors.text.primary,
-    letterSpacing: Typography.letterSpacing.tight,
   },
   subtitle: {
     fontSize: Typography.fontSize.base,
     color: Colors.text.secondary,
   },
   form: {
-    gap: Spacing.md,
+    gap: Spacing.base,
   },
   errorBanner: {
-    backgroundColor: Colors.semantic.riskBg,
-    borderWidth: 1,
-    borderColor: Colors.semantic.risk,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+    backgroundColor: Colors.status.concernBg,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
   },
   errorText: {
     flex: 1,
-    color: Colors.status.concernLight,
     fontSize: Typography.fontSize.sm,
+    color: Colors.status.concern,
   },
   inputGroup: {
     gap: Spacing.xs,
   },
   label: {
     fontSize: Typography.fontSize.sm,
-    fontWeight: '500',
-    color: Colors.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: Typography.letterSpacing.wider,
+    fontWeight: Typography.fontWeight.medium,
+    color: Colors.text.primary,
   },
-  inputWrapper: {
+  inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 52,
-    backgroundColor: Colors.glass.background,
+    height: 48,
+    backgroundColor: Colors.gray[50],
     borderWidth: 1,
-    borderColor: Colors.glass.border,
+    borderColor: Colors.border.default,
     borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.md,
-  },
-  inputIcon: {
-    marginRight: Spacing.sm,
+    gap: Spacing.sm,
   },
   input: {
     flex: 1,
-    color: Colors.text.primary,
     fontSize: Typography.fontSize.base,
-    height: '100%',
+    color: Colors.text.primary,
   },
-  eyeButton: {
-    padding: Spacing.xs,
-  },
-  button: {
-    height: 54,
+  primaryButton: {
+    height: 52,
+    backgroundColor: Colors.primary[600],
     borderRadius: BorderRadius.lg,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+    ...Shadows.md,
+  },
+  primaryButtonText: {
+    fontSize: Typography.fontSize.md,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.white,
   },
   buttonPressed: {
     opacity: 0.85,
     transform: [{ scale: 0.98 }],
   },
-  buttonPrimary: {
-    backgroundColor: Colors.accent.primary,
-    marginTop: Spacing.sm,
-    ...Shadows.md,
+  buttonDisabled: {
+    opacity: 0.6,
   },
-  buttonText: {
-    fontSize: Typography.fontSize.md,
-    fontWeight: '600',
-    color: Colors.white,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    marginVertical: Spacing.xs,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.border.default,
-  },
-  dividerText: {
-    fontSize: Typography.fontSize.sm,
+  terms: {
+    fontSize: Typography.fontSize.xs,
     color: Colors.text.tertiary,
-  },
-  buttonSocial: {
-    backgroundColor: Colors.glass.background,
-    borderWidth: 1,
-    borderColor: Colors.glass.borderLight,
-  },
-  socialButtonText: {
-    fontSize: Typography.fontSize.base,
-    fontWeight: '500',
-    color: Colors.text.primary,
+    textAlign: 'center',
+    lineHeight: 16,
   },
   footer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing.lg,
-    marginTop: Spacing.xl,
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    marginTop: 'auto',
+    paddingTop: Spacing['2xl'],
   },
   footerText: {
     fontSize: Typography.fontSize.sm,
     color: Colors.text.secondary,
   },
-  footerAccent: {
-    color: Colors.accent.primaryLight,
-    fontWeight: '600',
-  },
-  disclaimerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.base,
-  },
-  disclaimer: {
-    flex: 1,
-    textAlign: 'left',
-    fontSize: Typography.fontSize.xs,
-    color: Colors.text.tertiary,
-    lineHeight: 16,
+  footerLink: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.primary[600],
   },
 });

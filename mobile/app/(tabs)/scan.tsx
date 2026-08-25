@@ -1,7 +1,5 @@
 /**
  * SafeScan — Scan Tab
- * 
- * Main scan screen — live camera capture with overlay + gallery upload option.
  */
 
 import { useState, useRef } from 'react';
@@ -15,7 +13,6 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { useRouter } from 'expo-router';
 import { useCamera } from '../../hooks/useCamera';
 import { useImagePicker } from '../../hooks/useImagePicker';
-import { needsCompression, compressImage } from '../../utils/imageHelpers';
 
 const { width } = Dimensions.get('window');
 
@@ -23,25 +20,19 @@ export default function ScanScreen() {
   const { user } = useAuthStore();
   const { setCapturedImage, startScan } = useScanStore();
   const router = useRouter();
-  
+
   const cameraRef = useRef<CameraView>(null);
   const { hasPermission, checkAndRequestPermission, isPending } = useCamera();
   const { pickImage, isPicking } = useImagePicker();
-  
+
   const [isCapturing, setIsCapturing] = useState(false);
 
   const processAndUpload = async (uri: string) => {
     if (!user) return;
-    
     try {
       setCapturedImage(uri);
-      
-      // Check if compression is needed (mock for now, returns original URI)
-      const needsComp = await needsCompression(uri);
-      const processedUri = needsComp ? await compressImage(uri) : uri;
-      
       const fileName = `scan_${Date.now()}.jpg`;
-      const reportId = await startScan(user.$id, processedUri, fileName);
+      const reportId = await startScan(user.$id, uri, fileName);
       router.push(`/report/${reportId}`);
     } catch (err) {
       console.error('Failed to process image:', err);
@@ -50,17 +41,10 @@ export default function ScanScreen() {
 
   const handleTakePhoto = async () => {
     if (!cameraRef.current || isCapturing) return;
-    
     try {
       setIsCapturing(true);
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.8,
-        skipProcessing: false,
-      });
-      
-      if (photo?.uri) {
-        await processAndUpload(photo.uri);
-      }
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
+      if (photo?.uri) await processAndUpload(photo.uri);
     } catch (err) {
       console.error('Failed to take photo:', err);
     } finally {
@@ -71,46 +55,39 @@ export default function ScanScreen() {
   const handlePickImage = async () => {
     if (isPicking) return;
     const uri = await pickImage();
-    if (uri) {
-      await processAndUpload(uri);
-    }
+    if (uri) await processAndUpload(uri);
   };
 
-  // If permissions are pending
+  // Permission pending
   if (isPending) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={Colors.accent.primary} />
+          <ActivityIndicator size="large" color={Colors.primary[600]} />
           <Text style={styles.loadingText}>Initializing camera...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  // If permission denied
+  // Permission denied
   if (hasPermission === false) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.centerContent}>
-          <Ionicons name="camera-outline" size={48} color={Colors.status.concern} />
-          <Text style={styles.errorTitle}>Camera Access Denied</Text>
-          <Text style={styles.errorSubtitle}>
-            We need camera access to scan product labels.
-          </Text>
-          <Pressable style={styles.permissionButton} onPress={checkAndRequestPermission}>
-            <Text style={styles.permissionButtonText}>Grant Permission</Text>
-          </Pressable>
-          
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
+          <View style={styles.permDeniedIcon}>
+            <Ionicons name="camera-outline" size={32} color={Colors.gray[400]} />
           </View>
-          
-          <Pressable style={styles.secondaryButton} onPress={handlePickImage}>
-            <Ionicons name="images-outline" size={24} color={Colors.text.secondary} />
-            <Text style={styles.secondaryLabel}>Choose from Gallery instead</Text>
+          <Text style={styles.permTitle}>Camera Access Required</Text>
+          <Text style={styles.permSubtitle}>
+            We need camera access to scan product labels. You can also upload from your gallery.
+          </Text>
+          <Pressable style={styles.greenButton} onPress={checkAndRequestPermission}>
+            <Text style={styles.greenButtonText}>Grant Permission</Text>
+          </Pressable>
+          <Pressable style={styles.outlineButton} onPress={handlePickImage}>
+            <Ionicons name="images-outline" size={18} color={Colors.primary[600]} />
+            <Text style={styles.outlineButtonText}>Choose from Gallery</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -121,85 +98,65 @@ export default function ScanScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.greetingRow}>
-          <Ionicons name="hand-right-outline" size={18} color={Colors.text.secondary} />
-          <Text style={styles.greeting}>
-            Hello, {user?.name?.split(' ')[0] || 'there'}
-          </Text>
-        </View>
-        <Text style={styles.headerTitle}>Scan a Product</Text>
+        <Text style={styles.headerTitle}>Scan Product</Text>
         <Text style={styles.headerSubtitle}>
-          Photograph a food or cosmetic label to analyze its ingredients
+          Point your camera at the ingredient list on any food or cosmetic product.
         </Text>
       </View>
 
-      {/* Camera viewport */}
-      <View style={styles.viewfinderContainer}>
-        <View style={styles.viewfinder}>
-          <CameraView 
+      {/* Camera */}
+      <View style={styles.cameraContainer}>
+        <View style={styles.cameraView}>
+          <CameraView
             ref={cameraRef}
             style={StyleSheet.absoluteFillObject}
             facing="back"
           />
-          
-          {/* Overlay mask */}
-          <View style={styles.overlayMask}>
-            {/* Corner guides */}
-            <View style={[styles.corner, styles.cornerTL]} />
-            <View style={[styles.corner, styles.cornerTR]} />
-            <View style={[styles.corner, styles.cornerBL]} />
-            <View style={[styles.corner, styles.cornerBR]} />
-          </View>
+          {/* Corner guides */}
+          <View style={[styles.corner, styles.cTL]} />
+          <View style={[styles.corner, styles.cTR]} />
+          <View style={[styles.corner, styles.cBL]} />
+          <View style={[styles.corner, styles.cBR]} />
         </View>
 
         {/* Tips */}
         <View style={styles.tipsRow}>
-          <View style={styles.tip}>
-            <Ionicons name="bulb-outline" size={14} color={Colors.accent.tealLight} />
-            <Text style={styles.tipText}>Good lighting</Text>
-          </View>
-          <View style={styles.tip}>
-            <Ionicons name="resize-outline" size={14} color={Colors.accent.tealLight} />
-            <Text style={styles.tipText}>Flat surface</Text>
-          </View>
-          <View style={styles.tip}>
-            <Ionicons name="search-outline" size={14} color={Colors.accent.tealLight} />
-            <Text style={styles.tipText}>Clear text</Text>
-          </View>
+          <Tip icon="sunny-outline" text="Good lighting" />
+          <Tip icon="resize-outline" text="Flat surface" />
+          <Tip icon="text-outline" text="Clear text" />
         </View>
       </View>
 
-      {/* Action buttons */}
+      {/* Actions */}
       <View style={styles.actions}>
+        <Pressable style={styles.galleryButton} onPress={handlePickImage} disabled={isCapturing}>
+          <Ionicons name="images-outline" size={22} color={Colors.gray[600]} />
+        </Pressable>
+
         <Pressable
-          style={({ pressed }) => [
-            styles.captureButton, 
-            (pressed || isCapturing) && styles.captureButtonPressed
-          ]}
+          style={({ pressed }) => [styles.captureButton, (pressed || isCapturing) && styles.capturePressed]}
           onPress={handleTakePhoto}
           disabled={isCapturing}
         >
-          <View style={styles.captureButtonInner}>
-            {isCapturing ? (
-              <ActivityIndicator size="small" color={Colors.white} />
-            ) : (
-              <Ionicons name="camera" size={28} color={Colors.white} />
-            )}
-          </View>
+          {isCapturing ? (
+            <ActivityIndicator size="small" color={Colors.white} />
+          ) : (
+            <View style={styles.captureInner} />
+          )}
         </Pressable>
 
-        <View style={styles.secondaryActions}>
-          <Pressable
-            style={({ pressed }) => [styles.secondaryButtonAction, pressed && { opacity: 0.7 }]}
-            onPress={handlePickImage}
-            disabled={isCapturing || isPicking}
-          >
-            <Ionicons name="images-outline" size={24} color={Colors.text.secondary} />
-            <Text style={styles.secondaryLabelAction}>Gallery</Text>
-          </Pressable>
-        </View>
+        <View style={{ width: 48 }} />
       </View>
     </SafeAreaView>
+  );
+}
+
+function Tip({ icon, text }: { icon: any; text: string }) {
+  return (
+    <View style={styles.tip}>
+      <Ionicons name={icon} size={14} color={Colors.primary[600]} />
+      <Text style={styles.tipText}>{text}</Text>
+    </View>
   );
 }
 
@@ -207,7 +164,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background.primary,
-    paddingHorizontal: Spacing.lg,
   },
   centerContent: {
     flex: 1,
@@ -220,200 +176,150 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     fontSize: Typography.fontSize.base,
   },
-  errorTitle: {
+  permDeniedIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.gray[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.sm,
+  },
+  permTitle: {
     fontSize: Typography.fontSize.xl,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.text.primary,
   },
-  errorSubtitle: {
+  permSubtitle: {
     fontSize: Typography.fontSize.sm,
-    color: Colors.text.tertiary,
+    color: Colors.text.secondary,
     textAlign: 'center',
+    lineHeight: 20,
   },
-  permissionButton: {
-    backgroundColor: Colors.accent.primary,
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginTop: Spacing.lg,
-  },
-  permissionButtonText: {
-    color: Colors.white,
-    fontWeight: '600',
-  },
-  divider: {
-    flexDirection: 'row',
+  greenButton: {
+    height: 48,
+    paddingHorizontal: Spacing['2xl'],
+    backgroundColor: Colors.primary[600],
+    borderRadius: BorderRadius.lg,
     alignItems: 'center',
-    gap: Spacing.md,
-    marginVertical: Spacing.xl,
-    width: '100%',
+    justifyContent: 'center',
+    marginTop: Spacing.base,
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.border.default,
+  greenButtonText: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.white,
   },
-  dividerText: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.text.tertiary,
-  },
-  secondaryButton: {
+  outlineButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    backgroundColor: Colors.glass.background,
+    height: 44,
     paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: Colors.glass.border,
+    borderColor: Colors.primary[600],
+    borderRadius: BorderRadius.lg,
+    marginTop: Spacing.sm,
   },
-  secondaryLabel: {
+  outlineButtonText: {
     fontSize: Typography.fontSize.base,
-    color: Colors.text.secondary,
-    fontWeight: '500',
+    fontWeight: Typography.fontWeight.medium,
+    color: Colors.primary[600],
   },
   header: {
+    paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.base,
-    paddingBottom: Spacing.lg,
-  },
-  greetingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    marginBottom: Spacing.xs,
-  },
-  greeting: {
-    fontSize: Typography.fontSize.base,
-    color: Colors.text.secondary,
+    paddingBottom: Spacing.base,
   },
   headerTitle: {
     fontSize: Typography.fontSize['2xl'],
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.heavy,
     color: Colors.text.primary,
-    letterSpacing: Typography.letterSpacing.tight,
   },
   headerSubtitle: {
     fontSize: Typography.fontSize.sm,
-    color: Colors.text.tertiary,
+    color: Colors.text.secondary,
     marginTop: Spacing.xs,
+    lineHeight: 18,
   },
-  viewfinderContainer: {
+  cameraContainer: {
     flex: 1,
+    paddingHorizontal: Spacing.xl,
+    gap: Spacing.base,
     justifyContent: 'center',
-    gap: Spacing.lg,
   },
-  viewfinder: {
+  cameraView: {
     aspectRatio: 3 / 4,
-    maxHeight: 400,
-    backgroundColor: Colors.glass.background,
-    borderRadius: BorderRadius['2xl'],
-    borderWidth: 1,
-    borderColor: Colors.glass.border,
+    maxHeight: 420,
     alignSelf: 'center',
-    width: width - 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  overlayMask: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'transparent',
-    borderWidth: 40,
-    borderColor: 'rgba(10, 14, 26, 0.4)', // Dark overlay around the edges
+    width: width - 48,
     borderRadius: BorderRadius['2xl'],
+    overflow: 'hidden',
+    backgroundColor: Colors.gray[900],
   },
   corner: {
     position: 'absolute',
-    width: 30,
-    height: 30,
-    borderColor: Colors.accent.primary,
+    width: 28,
+    height: 28,
+    borderColor: Colors.primary[500],
   },
-  cornerTL: {
-    top: 16,
-    left: 16,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderTopLeftRadius: 8,
-  },
-  cornerTR: {
-    top: 16,
-    right: 16,
-    borderTopWidth: 3,
-    borderRightWidth: 3,
-    borderTopRightRadius: 8,
-  },
-  cornerBL: {
-    bottom: 16,
-    left: 16,
-    borderBottomWidth: 3,
-    borderLeftWidth: 3,
-    borderBottomLeftRadius: 8,
-  },
-  cornerBR: {
-    bottom: 16,
-    right: 16,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-    borderBottomRightRadius: 8,
-  },
+  cTL: { top: 16, left: 16, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 6 },
+  cTR: { top: 16, right: 16, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 6 },
+  cBL: { bottom: 16, left: 16, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 6 },
+  cBR: { bottom: 16, right: 16, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 6 },
   tipsRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: Spacing.base,
+    gap: Spacing.md,
   },
   tip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: Colors.glass.background,
+    backgroundColor: Colors.primary[50],
     borderRadius: BorderRadius.full,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderWidth: 1,
-    borderColor: Colors.glass.border,
+    paddingVertical: 6,
   },
   tipText: {
     fontSize: Typography.fontSize.xs,
-    color: Colors.text.secondary,
+    color: Colors.primary[700],
+    fontWeight: Typography.fontWeight.medium,
   },
   actions: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing['2xl'],
-    gap: Spacing.lg,
+    justifyContent: 'center',
+    gap: Spacing['2xl'],
+    paddingVertical: Spacing.xl,
+  },
+  galleryButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.gray[100],
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   captureButton: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: Colors.accent.primary,
+    backgroundColor: Colors.primary[600],
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadows.lg,
   },
-  captureButtonPressed: {
+  capturePressed: {
     transform: [{ scale: 0.92 }],
     opacity: 0.9,
   },
-  captureButtonInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  captureInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  secondaryActions: {
-    flexDirection: 'row',
-    gap: Spacing.xl,
-  },
-  secondaryButtonAction: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  secondaryLabelAction: {
-    fontSize: Typography.fontSize.xs,
-    color: Colors.text.secondary,
+    borderColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: 'transparent',
   },
 });

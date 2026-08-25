@@ -1,63 +1,46 @@
 /**
- * SafeScan — Profile Tab (with real icons)
+ * SafeScan — Profile Tab
  */
 
 import { View, Text, Pressable, ScrollView, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useProfileStore } from '../../stores/useProfileStore';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
-type MCIName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
-
-interface AllergenItem {
-  key: string;
-  label: string;
-  icon: IoniconsName | MCIName;
-  iconSet: 'ion' | 'mci';
-}
-
-const ALLERGEN_OPTIONS: AllergenItem[] = [
-  { key: 'milk', label: 'Milk / Dairy', icon: 'water-outline', iconSet: 'ion' },
-  { key: 'eggs', label: 'Eggs', icon: 'egg-outline', iconSet: 'mci' },
-  { key: 'peanuts', label: 'Peanuts', icon: 'peanut-outline', iconSet: 'mci' },
-  { key: 'tree_nuts', label: 'Tree Nuts', icon: 'tree-outline', iconSet: 'mci' },
-  { key: 'wheat_gluten', label: 'Wheat / Gluten', icon: 'barley', iconSet: 'mci' },
-  { key: 'soy', label: 'Soy', icon: 'leaf-outline', iconSet: 'ion' },
-  { key: 'fish', label: 'Fish', icon: 'fish-outline', iconSet: 'ion' },
-  { key: 'shellfish', label: 'Shellfish', icon: 'fish-outline', iconSet: 'mci' },
-  { key: 'sesame', label: 'Sesame', icon: 'grain', iconSet: 'mci' },
-  { key: 'celery', label: 'Celery', icon: 'leaf-outline', iconSet: 'ion' },
-  { key: 'mustard', label: 'Mustard', icon: 'circle-small', iconSet: 'mci' },
-  { key: 'sulfites', label: 'Sulfites', icon: 'flask-outline', iconSet: 'ion' },
-];
 
 const JURISDICTIONS = [
-  { code: 'NG', label: 'Nigeria (NAFDAC)', flag: '🇳🇬' },
-  { code: 'KE', label: 'Kenya (KEBS)', flag: '🇰🇪' },
-  { code: 'ZA', label: 'South Africa (SAHPRA)', flag: '🇿🇦' },
-  { code: 'GH', label: 'Ghana (FDA-Ghana)', flag: '🇬🇭' },
-  { code: 'US', label: 'United States (FDA)', flag: '🇺🇸' },
-  { code: 'EU', label: 'European Union (EC)', flag: '🇪🇺' },
+  { code: 'NG', label: 'Nigeria', flag: '🇳🇬' },
+  { code: 'KE', label: 'Kenya', flag: '🇰🇪' },
+  { code: 'ZA', label: 'South Africa', flag: '🇿🇦' },
+  { code: 'GH', label: 'Ghana', flag: '🇬🇭' },
+  { code: 'US', label: 'United States', flag: '🇺🇸' },
+  { code: 'EU', label: 'European Union', flag: '🇪🇺' },
 ];
 
-interface DietaryItem {
-  key: string;
-  label: string;
-  icon: IoniconsName;
-}
+const ALLERGENS = [
+  { key: 'milk', label: 'Milk / Dairy' },
+  { key: 'eggs', label: 'Eggs' },
+  { key: 'peanuts', label: 'Peanuts' },
+  { key: 'tree_nuts', label: 'Tree Nuts' },
+  { key: 'wheat_gluten', label: 'Wheat / Gluten' },
+  { key: 'soy', label: 'Soy' },
+  { key: 'fish', label: 'Fish' },
+  { key: 'shellfish', label: 'Shellfish' },
+  { key: 'sesame', label: 'Sesame' },
+];
 
-const DIETARY_OPTIONS: DietaryItem[] = [
-  { key: 'vegan', label: 'Vegan', icon: 'leaf-outline' },
-  { key: 'vegetarian', label: 'Vegetarian', icon: 'nutrition-outline' },
-  { key: 'halal', label: 'Halal', icon: 'checkmark-done-outline' },
-  { key: 'kosher', label: 'Kosher', icon: 'star-outline' },
-  { key: 'keto', label: 'Keto', icon: 'flame-outline' },
-  { key: 'gluten_free', label: 'Gluten Free', icon: 'close-circle-outline' },
-  { key: 'dairy_free', label: 'Dairy Free', icon: 'water-outline' },
-  { key: 'organic', label: 'Organic Only', icon: 'flower-outline' },
+const DIETARY = [
+  { key: 'vegan', label: 'Vegan' },
+  { key: 'vegetarian', label: 'Vegetarian' },
+  { key: 'halal', label: 'Halal' },
+  { key: 'kosher', label: 'Kosher' },
+  { key: 'keto', label: 'Keto' },
+  { key: 'gluten_free', label: 'Gluten Free' },
+  { key: 'dairy_free', label: 'Dairy Free' },
+  { key: 'organic', label: 'Organic Only' },
 ];
 
 export default function ProfileScreen() {
@@ -91,104 +74,77 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* User info card */}
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* User card */}
         <View style={styles.userCard}>
           <View style={styles.avatar}>
-            <Ionicons name="person" size={24} color={Colors.white} />
+            <Text style={styles.avatarText}>
+              {(user?.name || 'U').charAt(0).toUpperCase()}
+            </Text>
           </View>
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{user?.name || 'User'}</Text>
             <Text style={styles.userEmail}>{user?.email || ''}</Text>
           </View>
-          <Ionicons name="create-outline" size={20} color={Colors.text.tertiary} />
         </View>
 
-        {/* Jurisdiction section */}
+        {/* Jurisdiction */}
         <View style={styles.section}>
-          <View style={styles.sectionTitleRow}>
-            <Ionicons name="globe-outline" size={20} color={Colors.accent.tealLight} />
-            <Text style={styles.sectionTitle}>Jurisdiction</Text>
-          </View>
-          <Text style={styles.sectionSubtitle}>Regulatory framework for safety assessments</Text>
+          <Text style={styles.sectionTitle}>Regulatory Region</Text>
+          <Text style={styles.sectionSubtitle}>Safety standards used for assessments</Text>
           <View style={styles.chipGrid}>
             {JURISDICTIONS.map(j => (
               <Pressable
                 key={j.code}
-                style={[
-                  styles.chip,
-                  selectedJurisdiction === j.code && styles.chipActive,
-                ]}
+                style={[styles.chip, selectedJurisdiction === j.code && styles.chipActive]}
                 onPress={() => updateJurisdiction(j.code)}
               >
-                <Text style={styles.flagText}>{j.flag}</Text>
-                <Text style={[
-                  styles.chipText,
-                  selectedJurisdiction === j.code && styles.chipTextActive,
-                ]}>
+                <Text style={styles.chipFlag}>{j.flag}</Text>
+                <Text style={[styles.chipText, selectedJurisdiction === j.code && styles.chipTextActive]}>
                   {j.label}
                 </Text>
                 {selectedJurisdiction === j.code && (
-                  <Ionicons name="checkmark" size={16} color={Colors.accent.primaryLight} />
+                  <Ionicons name="checkmark" size={14} color={Colors.primary[600]} />
                 )}
               </Pressable>
             ))}
           </View>
         </View>
 
-        {/* Allergens section */}
+        {/* Allergens */}
         <View style={styles.section}>
-          <View style={styles.sectionTitleRow}>
-            <Ionicons name="warning-outline" size={20} color={Colors.status.caution} />
-            <Text style={styles.sectionTitle}>Allergen Alerts</Text>
-          </View>
-          <Text style={styles.sectionSubtitle}>Get flagged when these allergens are detected</Text>
+          <Text style={styles.sectionTitle}>Allergen Alerts</Text>
+          <Text style={styles.sectionSubtitle}>Get warnings when these are detected</Text>
           <View style={styles.chipGrid}>
-            {ALLERGEN_OPTIONS.map(a => {
-              const isSelected = selectedAllergens.includes(a.key);
+            {ALLERGENS.map(a => {
+              const selected = selectedAllergens.includes(a.key);
               return (
                 <Pressable
                   key={a.key}
-                  style={[styles.chip, isSelected && styles.chipDanger]}
+                  style={[styles.chip, selected && styles.chipDanger]}
                   onPress={() => toggleAllergen(a.key)}
                 >
-                  {a.iconSet === 'ion' ? (
-                    <Ionicons name={a.icon as IoniconsName} size={16} color={isSelected ? Colors.status.caution : Colors.text.tertiary} />
-                  ) : (
-                    <MaterialCommunityIcons name={a.icon as MCIName} size={16} color={isSelected ? Colors.status.caution : Colors.text.tertiary} />
-                  )}
-                  <Text style={[styles.chipText, isSelected && styles.chipTextDanger]}>
-                    {a.label}
-                  </Text>
+                  <Text style={[styles.chipText, selected && styles.chipTextDanger]}>{a.label}</Text>
                 </Pressable>
               );
             })}
           </View>
         </View>
 
-        {/* Dietary preferences */}
+        {/* Dietary */}
         <View style={styles.section}>
-          <View style={styles.sectionTitleRow}>
-            <Ionicons name="restaurant-outline" size={20} color={Colors.accent.primaryLight} />
-            <Text style={styles.sectionTitle}>Dietary Preferences</Text>
-          </View>
-          <Text style={styles.sectionSubtitle}>Filter products by dietary requirements</Text>
+          <Text style={styles.sectionTitle}>Dietary Preferences</Text>
+          <Text style={styles.sectionSubtitle}>Filter products by diet</Text>
           <View style={styles.chipGrid}>
-            {DIETARY_OPTIONS.map(d => {
-              const isSelected = selectedDietary.includes(d.key);
+            {DIETARY.map(d => {
+              const selected = selectedDietary.includes(d.key);
               return (
                 <Pressable
                   key={d.key}
-                  style={[styles.chip, isSelected && styles.chipActive]}
+                  style={[styles.chip, selected && styles.chipActive]}
                   onPress={() => toggleDietary(d.key)}
                 >
-                  <Ionicons name={d.icon} size={16} color={isSelected ? Colors.accent.primaryLight : Colors.text.tertiary} />
-                  <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
-                    {d.label}
-                  </Text>
+                  <Text style={[styles.chipText, selected && styles.chipTextActive]}>{d.label}</Text>
                 </Pressable>
               );
             })}
@@ -200,21 +156,16 @@ export default function ProfileScreen() {
           style={({ pressed }) => [styles.logoutButton, pressed && { opacity: 0.8 }]}
           onPress={handleLogout}
         >
-          <Ionicons name="log-out-outline" size={20} color={Colors.status.concern} />
+          <Ionicons name="log-out-outline" size={18} color={Colors.status.concern} />
           <Text style={styles.logoutText}>Sign Out</Text>
         </Pressable>
 
-        {/* App info */}
-        <View style={styles.appInfo}>
-          <Ionicons name="shield-checkmark-outline" size={20} color={Colors.text.tertiary} />
-          <Text style={styles.appInfoText}>SafeScan v1.0.0</Text>
-          <Text style={styles.appInfoText}>AI-Powered Product Safety Intelligence</Text>
-          <View style={styles.disclaimerRow}>
-            <Ionicons name="information-circle-outline" size={14} color={Colors.text.tertiary} />
-            <Text style={styles.disclaimer}>
-              This app provides informational assessments based on ingredient labels and available evidence.
-            </Text>
-          </View>
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>SafeScan v1.0.0</Text>
+          <Text style={styles.footerHint}>
+            Assessments are informational and not a substitute for professional advice.
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -224,38 +175,41 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background.primary,
+    backgroundColor: Colors.background.secondary,
   },
   scrollContent: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.base,
+    padding: Spacing.base,
     paddingBottom: Spacing['4xl'],
-    gap: Spacing.xl,
+    gap: Spacing.base,
   },
   userCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.base,
-    backgroundColor: Colors.glass.background,
-    borderWidth: 1,
-    borderColor: Colors.glass.border,
+    backgroundColor: Colors.white,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
+    ...Shadows.card,
   },
   avatar: {
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: Colors.accent.primary,
+    backgroundColor: Colors.primary[600],
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.white,
   },
   userInfo: {
     flex: 1,
   },
   userName: {
     fontSize: Typography.fontSize.lg,
-    fontWeight: '600',
+    fontWeight: Typography.fontWeight.semibold,
     color: Colors.text.primary,
   },
   userEmail: {
@@ -264,16 +218,15 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   section: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
     gap: Spacing.md,
-  },
-  sectionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
+    ...Shadows.card,
   },
   sectionTitle: {
     fontSize: Typography.fontSize.md,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.text.primary,
   },
   sectionSubtitle: {
@@ -290,31 +243,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: Colors.glass.background,
+    backgroundColor: Colors.gray[50],
     borderWidth: 1,
-    borderColor: Colors.glass.border,
+    borderColor: Colors.border.default,
     borderRadius: BorderRadius.full,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
   },
   chipActive: {
-    backgroundColor: 'rgba(99, 102, 241, 0.15)',
-    borderColor: Colors.accent.primary,
+    backgroundColor: Colors.primary[50],
+    borderColor: Colors.primary[600],
   },
   chipDanger: {
-    backgroundColor: Colors.semantic.allergenBg,
-    borderColor: Colors.semantic.allergen,
+    backgroundColor: Colors.status.cautionBg,
+    borderColor: Colors.status.caution,
   },
-  flagText: {
+  chipFlag: {
     fontSize: 16,
   },
   chipText: {
     fontSize: Typography.fontSize.sm,
     color: Colors.text.secondary,
-    fontWeight: '500',
+    fontWeight: Typography.fontWeight.medium,
   },
   chipTextActive: {
-    color: Colors.accent.primaryLight,
+    color: Colors.primary[700],
   },
   chipTextDanger: {
     color: Colors.status.caution,
@@ -324,7 +277,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
     borderColor: Colors.status.concern,
-    backgroundColor: Colors.semantic.riskBg,
+    backgroundColor: Colors.status.concernBg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -332,29 +285,24 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     fontSize: Typography.fontSize.base,
-    fontWeight: '600',
+    fontWeight: Typography.fontWeight.semibold,
     color: Colors.status.concern,
   },
-  appInfo: {
+  footer: {
     alignItems: 'center',
     gap: Spacing.xs,
-    paddingTop: Spacing.lg,
+    paddingTop: Spacing.base,
   },
-  appInfoText: {
+  footerText: {
     fontSize: Typography.fontSize.xs,
     color: Colors.text.tertiary,
+    fontWeight: Typography.fontWeight.medium,
   },
-  disclaimerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.base,
-    marginTop: Spacing.sm,
-  },
-  disclaimer: {
-    flex: 1,
+  footerHint: {
     fontSize: Typography.fontSize.xs,
     color: Colors.text.tertiary,
+    textAlign: 'center',
     lineHeight: 16,
+    paddingHorizontal: Spacing.xl,
   },
 });

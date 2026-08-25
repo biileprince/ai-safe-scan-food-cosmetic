@@ -1,80 +1,78 @@
 /**
  * SafeScan — Assessment Tier Definitions
- * 
- * Maps each assessment category to its display properties.
  */
 
-export type AssessmentTier =
+export type AssessmentTier = 
   | 'generally_favorable'
   | 'use_with_caution'
   | 'high_concern'
   | 'insufficient_evidence';
 
 export interface AssessmentDefinition {
-  key: AssessmentTier;
   label: string;
   shortLabel: string;
   description: string;
   userAction: string;
-  icon: string;          // Emoji for quick visual — replaced with custom icons later
   colorKey: 'favorable' | 'caution' | 'concern' | 'insufficient';
 }
 
 export const ASSESSMENTS: Record<AssessmentTier, AssessmentDefinition> = {
   generally_favorable: {
-    key: 'generally_favorable',
     label: 'Generally Favorable',
     shortLabel: 'Favorable',
-    description: 'No major concerns identified from available label information.',
-    userAction: 'Normal use/consumption according to label.',
-    icon: '✅',
+    description: 'Based on available label information, no major safety concerns were identified for the declared ingredients.',
+    userAction: 'This product appears suitable based on available evidence.',
     colorKey: 'favorable',
   },
   use_with_caution: {
-    key: 'use_with_caution',
     label: 'Use With Caution',
     shortLabel: 'Caution',
-    description: 'One or more issues require attention but do not automatically establish that the product is unsafe.',
-    userAction: 'Review details and consider personal circumstances.',
-    icon: '⚠️',
+    description: 'Some ingredients require attention. The issues do not prove the product is unsafe, but warrant awareness.',
+    userAction: 'Review the flagged ingredients and consider your personal sensitivities.',
     colorKey: 'caution',
   },
   high_concern: {
-    key: 'high_concern',
     label: 'High Concern',
     shortLabel: 'Concern',
-    description: 'A serious concern or strong regulatory warning is identified.',
-    userAction: 'Avoid until verified.',
-    icon: '🚫',
+    description: 'One or more ingredients are flagged as high-risk, restricted, or match your allergen profile.',
+    userAction: 'Review the specific concerns carefully before using this product.',
     colorKey: 'concern',
   },
   insufficient_evidence: {
-    key: 'insufficient_evidence',
     label: 'Insufficient Evidence',
-    shortLabel: 'Insufficient',
-    description: 'The image or label data is incomplete or too uncertain for a reliable assessment.',
-    userAction: 'Retake photo or verify label manually.',
-    icon: '❓',
+    shortLabel: 'Uncertain',
+    description: 'The label image was unclear or the ingredient list could not be reliably extracted.',
+    userAction: 'Try rescanning with better lighting or a clearer image.',
     colorKey: 'insufficient',
   },
-} as const;
+};
 
-/**
- * Get the assessment definition for a given tier key.
- */
-export function getAssessment(tier: AssessmentTier): AssessmentDefinition {
-  return ASSESSMENTS[tier];
+export function getAssessmentColor(tier: AssessmentTier): string {
+  const { Colors } = require('./theme');
+  const def = ASSESSMENTS[tier];
+  if (!def) return Colors.gray[500];
+
+  const map: Record<string, string> = {
+    favorable: Colors.status.favorable,
+    caution: Colors.status.caution,
+    concern: Colors.status.concern,
+    insufficient: Colors.status.insufficient,
+  };
+
+  return map[def.colorKey] || Colors.gray[500];
 }
 
-/**
- * Get assessment color key → maps to Colors.status[colorKey] in theme.ts
- */
-export function getAssessmentColor(tier: AssessmentTier): string {
-  const colorMap: Record<AssessmentDefinition['colorKey'], string> = {
-    favorable: '#10B981',
-    caution: '#F59E0B',
-    concern: '#EF4444',
-    insufficient: '#8B5CF6',
+export function getAssessmentBgColor(tier: AssessmentTier): string {
+  const { Colors } = require('./theme');
+  const def = ASSESSMENTS[tier];
+  if (!def) return Colors.gray[50];
+
+  const map: Record<string, string> = {
+    favorable: Colors.status.favorableBg,
+    caution: Colors.status.cautionBg,
+    concern: Colors.status.concernBg,
+    insufficient: Colors.status.insufficientBg,
   };
-  return colorMap[ASSESSMENTS[tier].colorKey];
+
+  return map[def.colorKey] || Colors.gray[50];
 }

@@ -1,287 +1,205 @@
 /**
- * SafeScan — Report Detail Screen (with real icons)
+ * SafeScan — Report Detail Screen
  * 
- * Dynamic route: /report/[id]
+ * Clean, card-based interface displaying the final safety assessment.
  */
 
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, StyleSheet, Image, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import * as scanService from '../../services/scan.service';
-import type { ScanReport, ParsedBenefit, ParsedConcern } from '../../services/scan.service';
-import { ASSESSMENTS, getAssessmentColor } from '../../constants/assessments';
+import type { ScanReport, ParsedConcern, ParsedBenefit } from '../../services/scan.service';
+import { getImageUrl } from '../../services/storage.service';
+
+import Badge from '../../components/ui/Badge';
+import ConfidenceMeter from '../../components/ui/ConfidenceMeter';
+import IngredientRow from '../../components/report/IngredientRow';
+import DisclaimerBanner from '../../components/report/DisclaimerBanner';
+import ScanProgress from '../../components/scan/ScanProgress';
 import type { AssessmentTier } from '../../constants/assessments';
-
-type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
-
-const ASSESSMENT_ICONS: Record<string, IoniconsName> = {
-  favorable: 'checkmark-circle',
-  caution: 'warning',
-  concern: 'close-circle',
-  insufficient: 'help-circle',
-};
 
 export default function ReportScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+
   const [report, setReport] = useState<ScanReport | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!id) return;
+    let interval: NodeJS.Timeout;
 
-    let interval: ReturnType<typeof setInterval>;
-
-    const loadReport = async () => {
+    const fetchReport = async () => {
       try {
+        if (!id) return;
         const data = await scanService.getReport(id);
         setReport(data);
-
-        if (data.status === 'processing') {
-          interval = setInterval(async () => {
-            try {
-              const updated = await scanService.getReport(id);
-              setReport(updated);
-              if (updated.status !== 'processing') {
-                clearInterval(interval);
-              }
-            } catch {
-              clearInterval(interval);
-            }
-          }, 3000);
+        
+        // If it's done, stop polling
+        if (data.status !== 'processing') {
+          setLoading(false);
+          if (interval) clearInterval(interval);
         }
-      } catch (err: any) {
-        setError(err?.message || 'Failed to load report.');
-      } finally {
-        setIsLoading(false);
+      } catch (err) {
+        console.error('Fetch report error:', err);
+        setError('Failed to load report.');
+        setLoading(false);
+        if (interval) clearInterval(interval);
       }
     };
 
-    loadReport();
-    return () => { if (interval) clearInterval(interval); };
+    fetchReport();
+    interval = setInterval(fetchReport, 3000);
+
+    return () => clearInterval(interval);
   }, [id]);
 
-  if (isLoading) {
+  if (error) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.accent.primary} />
-        <Text style={styles.loadingText}>Loading report…</Text>
-      </View>
-    );
-  }
-
-  if (error || !report) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Ionicons name="alert-circle-outline" size={48} color={Colors.status.caution} />
-        <Text style={styles.errorText}>{error || 'Report not found.'}</Text>
-        <Pressable style={styles.backButtonSmall} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={18} color={Colors.text.primary} />
-          <Text style={styles.backButtonText}>Go Back</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  if (report.status === 'processing') {
-    return (
-      <View style={styles.loadingContainer}>
-        <View style={styles.processingAnimation}>
-          <MaterialCommunityIcons name="flask-round-bottom" size={36} color={Colors.accent.primaryLight} />
-        </View>
-        <Text style={styles.processingTitle}>Analyzing Product…</Text>
-        <Text style={styles.processingSubtitle}>
-          Extracting ingredients and checking safety databases
-        </Text>
-        <View style={styles.processingSteps}>
-          <View style={styles.stepRow}>
-            <Ionicons name="checkmark-circle" size={18} color={Colors.status.favorable} />
-            <Text style={styles.processingStep}>Image uploaded</Text>
-          </View>
-          <View style={styles.stepRow}>
-            <ActivityIndicator size="small" color={Colors.accent.primary} />
-            <Text style={styles.processingStep}>Extracting text…</Text>
-          </View>
-          <View style={[styles.stepRow, { opacity: 0.4 }]}>
-            <Ionicons name="ellipse-outline" size={18} color={Colors.text.tertiary} />
-            <Text style={styles.processingStep}>Analyzing ingredients</Text>
-          </View>
-          <View style={[styles.stepRow, { opacity: 0.3 }]}>
-            <Ionicons name="ellipse-outline" size={18} color={Colors.text.tertiary} />
-            <Text style={styles.processingStep}>Generating report</Text>
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  const assessment = report.overallAssessment as AssessmentTier;
-  const assessmentDef = assessment ? ASSESSMENTS[assessment] : null;
-  const assessmentColor = assessment ? getAssessmentColor(assessment) : Colors.text.tertiary;
-  const assessmentIcon = assessmentDef ? ASSESSMENT_ICONS[assessmentDef.colorKey] : 'help-circle';
-  const benefits = scanService.parseBenefits(report.benefits);
-  const concerns = scanService.parseConcerns(report.concerns);
-
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
+      <SafeAreaView style={styles.errorContainer}>
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={20} color={Colors.text.primary} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Safety Report</Text>
-          <Pressable style={styles.shareButton}>
-            <Ionicons name="share-outline" size={20} color={Colors.text.secondary} />
+            <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
           </Pressable>
         </View>
-
-        {/* Product info */}
-        <View style={styles.productCard}>
-          <View style={styles.productIconWrap}>
-            <Ionicons name="cube-outline" size={24} color={Colors.accent.primaryLight} />
-          </View>
-          <View style={styles.productInfo}>
-            <Text style={styles.productName}>{report.productName || 'Unknown Product'}</Text>
-            <View style={styles.categoryRow}>
-              <Ionicons name="pricetag-outline" size={14} color={Colors.text.tertiary} />
-              <Text style={styles.productCategory}>{report.productCategory || 'Unclassified'}</Text>
-            </View>
-          </View>
+        <View style={styles.errorContent}>
+          <Ionicons name="alert-circle-outline" size={64} color={Colors.status.concern} />
+          <Text style={styles.errorTitle}>Oops!</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <Pressable style={styles.retryButton} onPress={() => router.replace('/(tabs)/scan')}>
+            <Text style={styles.retryText}>Try Again</Text>
+          </Pressable>
         </View>
+      </SafeAreaView>
+    );
+  }
 
-        {/* Assessment badge */}
-        {assessmentDef && (
-          <View style={[styles.assessmentCard, { borderColor: assessmentColor }]}>
-            <View style={[styles.assessmentBadge, { backgroundColor: assessmentColor + '20' }]}>
-              <Ionicons name={assessmentIcon} size={22} color={assessmentColor} />
-              <Text style={[styles.assessmentLabel, { color: assessmentColor }]}>
-                {assessmentDef.label}
-              </Text>
-            </View>
-            <Text style={styles.assessmentDescription}>{assessmentDef.description}</Text>
-            <View style={styles.actionRow}>
-              <Ionicons name="bulb-outline" size={16} color={Colors.text.tertiary} />
-              <Text style={styles.assessmentAction}>{assessmentDef.userAction}</Text>
-            </View>
-          </View>
-        )}
+  if (loading || report?.status === 'processing') {
+    return <ScanProgress currentStep={3} />; // Simplified for now
+  }
 
-        {/* Confidence scores */}
-        <View style={styles.confidenceCard}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="analytics-outline" size={18} color={Colors.accent.primaryLight} />
-            <Text style={styles.sectionTitle}>Confidence</Text>
-          </View>
-          <View style={styles.confidenceRow}>
-            <Ionicons name="text-outline" size={16} color={Colors.text.tertiary} />
-            <Text style={styles.confidenceLabel}>Label Extraction</Text>
-            <Text style={styles.confidenceValue}>
-              {report.ocrConfidence != null ? `${Math.round(report.ocrConfidence * 100)}%` : '—'}
-            </Text>
-          </View>
-          <View style={styles.confidenceRow}>
-            <MaterialCommunityIcons name="molecule" size={16} color={Colors.text.tertiary} />
-            <Text style={styles.confidenceLabel}>Ingredient Matching</Text>
-            <Text style={styles.confidenceValue}>
-              {report.matchConfidence != null ? `${Math.round(report.matchConfidence * 100)}%` : '—'}
-            </Text>
-          </View>
-        </View>
+  if (!report) return null;
 
-        {/* Benefits section */}
-        {benefits.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="checkmark-circle" size={20} color={Colors.status.favorable} />
-              <Text style={styles.sectionTitle}>Potential Benefits</Text>
-            </View>
-            {benefits.map((b, i) => (
-              <View key={i} style={[styles.findingCard, { borderLeftColor: Colors.status.favorable }]}>
-                <Text style={styles.findingIngredient}>{b.ingredient}</Text>
-                <Text style={styles.findingDescription}>{b.description}</Text>
-                <View style={styles.evidenceRow}>
-                  <Ionicons name="document-text-outline" size={12} color={Colors.text.tertiary} />
-                  <Text style={styles.findingEvidence}>Evidence: {b.evidenceLevel}</Text>
-                </View>
+  const concerns = scanService.parseConcerns(report.concerns);
+  const benefits = scanService.parseBenefits(report.benefits);
+  const imageUrl = getImageUrl(report.imageFileId);
+  const assessment = (report.overallAssessment || 'insufficient_evidence') as AssessmentTier;
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Custom Header */}
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="close" size={24} color={Colors.text.primary} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Scan Results</Text>
+        <Pressable style={styles.shareButton}>
+          <Ionicons name="share-outline" size={22} color={Colors.primary[600]} />
+        </Pressable>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Product Overview Card */}
+        <View style={styles.card}>
+          <View style={styles.productRow}>
+            {imageUrl ? (
+              <Image source={{ uri: imageUrl }} style={styles.productImage} />
+            ) : (
+              <View style={styles.productImagePlaceholder}>
+                <Ionicons name="image-outline" size={24} color={Colors.gray[400]} />
               </View>
-            ))}
+            )}
+            <View style={styles.productInfo}>
+              <Text style={styles.productName}>{report.productName || 'Unknown Product'}</Text>
+              <Text style={styles.productCategory}>{report.productCategory || 'Uncategorized'}</Text>
+              <View style={styles.badgeWrap}>
+                <Badge assessment={assessment} size="md" />
+              </View>
+            </View>
+          </View>
+          
+          <View style={styles.divider} />
+          
+          <Text style={styles.explanationText}>
+            {report.explanationText || 'Analysis complete. See details below.'}
+          </Text>
+          
+          <View style={styles.divider} />
+          
+          <View style={styles.confidenceRow}>
+            <View style={styles.confidenceItem}>
+              <Text style={styles.confidenceLabel}>Label Clarity</Text>
+              <ConfidenceMeter value={report.ocrConfidence || 0} size={100} />
+            </View>
+            <View style={styles.confidenceItem}>
+              <Text style={styles.confidenceLabel}>Data Match</Text>
+              <ConfidenceMeter value={report.matchConfidence || 0} size={100} />
+            </View>
+          </View>
+        </View>
+
+        {/* Flagged Allergens (if any) */}
+        {report.allergenFlags && report.allergenFlags.length > 0 && (
+          <View style={[styles.card, styles.alertCard]}>
+            <View style={styles.alertHeader}>
+              <Ionicons name="warning" size={20} color={Colors.status.concern} />
+              <Text style={styles.alertTitle}>Allergen Warning</Text>
+            </View>
+            <Text style={styles.alertText}>
+              This product contains: <Text style={styles.alertHighlight}>{report.allergenFlags.join(', ')}</Text>.
+            </Text>
           </View>
         )}
 
-        {/* Concerns section */}
-        {concerns.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="warning" size={20} color={Colors.status.caution} />
-              <Text style={styles.sectionTitle}>Potential Concerns</Text>
+        {/* Concerns */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Concerns & Alerts</Text>
+          {concerns.length === 0 ? (
+            <View style={styles.emptyList}>
+              <Ionicons name="checkmark-circle-outline" size={24} color={Colors.status.favorable} />
+              <Text style={styles.emptyListText}>No specific concerns found.</Text>
             </View>
-            {concerns.map((c, i) => {
-              const severityColor = c.severity === 'critical' || c.severity === 'high'
-                ? Colors.status.concern
-                : c.severity === 'moderate'
-                  ? Colors.status.caution
-                  : Colors.text.secondary;
-
-              return (
-                <View key={i} style={[styles.findingCard, { borderLeftColor: severityColor }]}>
-                  <View style={styles.findingHeaderRow}>
-                    <Text style={styles.findingIngredient}>{c.ingredient}</Text>
-                    <View style={[styles.severityBadge, { backgroundColor: severityColor + '20' }]}>
-                      <Text style={[styles.severityText, { color: severityColor }]}>
-                        {c.severity.toUpperCase()}
-                      </Text>
+          ) : (
+            <View style={styles.ingredientList}>
+              {concerns.map((c, i) => (
+                <View key={`concern-${i}`} style={styles.ingredientItem}>
+                  <View style={styles.ingredientHeader}>
+                    <Text style={styles.ingredientName}>{c.ingredient}</Text>
+                    <View style={[styles.severityPill, c.severity === 'critical' ? styles.sevCritical : c.severity === 'high' ? styles.sevHigh : styles.sevMod]}>
+                      <Text style={styles.severityText}>{c.severity}</Text>
                     </View>
                   </View>
-                  <Text style={styles.findingDescription}>{c.description}</Text>
-                  <View style={styles.evidenceRow}>
-                    <Ionicons name="link-outline" size={12} color={Colors.text.tertiary} />
-                    <Text style={styles.findingSource}>Source: {c.source}</Text>
-                  </View>
+                  <Text style={styles.ingredientDesc}>{c.description}</Text>
                 </View>
-              );
-            })}
-          </View>
-        )}
-
-        {/* Allergen flags */}
-        {report.allergenFlags && report.allergenFlags.length > 0 && (
-          <View style={styles.allergenBanner}>
-            <View style={styles.allergenTitleRow}>
-              <Ionicons name="warning" size={20} color={Colors.status.caution} />
-              <Text style={styles.allergenTitle}>Allergen Alert</Text>
+              ))}
             </View>
-            <Text style={styles.allergenList}>
-              {report.allergenFlags.join(', ')}
-            </Text>
-          </View>
-        )}
-
-        {/* Explanation text */}
-        {report.explanationText && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="reader-outline" size={18} color={Colors.accent.primaryLight} />
-              <Text style={styles.sectionTitle}>Analysis Summary</Text>
-            </View>
-            <Text style={styles.explanationText}>{report.explanationText}</Text>
-          </View>
-        )}
-
-        {/* Disclaimer */}
-        <View style={styles.disclaimer}>
-          <Ionicons name="information-circle-outline" size={16} color={Colors.text.tertiary} />
-          <Text style={styles.disclaimerText}>
-            This assessment is based on the declared ingredient list and referenced evidence. The photograph does not establish the actual concentration or laboratory purity of the ingredients. This is not a substitute for professional medical or regulatory advice.
-          </Text>
+          )}
         </View>
+
+        {/* Benefits */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Beneficial Ingredients</Text>
+          {benefits.length === 0 ? (
+            <View style={styles.emptyList}>
+              <Text style={styles.emptyListText}>No notable benefits identified.</Text>
+            </View>
+          ) : (
+            <View style={styles.ingredientList}>
+              {benefits.map((b, i) => (
+                <View key={`benefit-${i}`} style={styles.ingredientItem}>
+                  <Text style={styles.ingredientName}>{b.ingredient}</Text>
+                  <Text style={styles.ingredientDesc}>{b.description}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        <DisclaimerBanner />
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -290,308 +208,210 @@ export default function ReportScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background.primary,
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: Colors.background.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.md,
-    paddingHorizontal: Spacing['2xl'],
-  },
-  loadingText: {
-    color: Colors.text.secondary,
-    fontSize: Typography.fontSize.base,
-  },
-  errorText: {
-    color: Colors.text.secondary,
-    fontSize: Typography.fontSize.base,
-    textAlign: 'center',
-  },
-  backButtonSmall: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.glass.background,
-    borderWidth: 1,
-    borderColor: Colors.glass.border,
-    marginTop: Spacing.md,
-  },
-  backButtonText: {
-    color: Colors.text.primary,
-    fontWeight: '500',
-  },
-  processingAnimation: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.glass.background,
-    borderWidth: 1,
-    borderColor: Colors.glass.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  processingTitle: {
-    fontSize: Typography.fontSize.xl,
-    fontWeight: '700',
-    color: Colors.text.primary,
-  },
-  processingSubtitle: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.text.tertiary,
-    textAlign: 'center',
-  },
-  processingSteps: {
-    gap: Spacing.md,
-    marginTop: Spacing.lg,
-  },
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  processingStep: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.text.secondary,
-  },
-  scrollContent: {
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing['4xl'],
-    gap: Spacing.lg,
+    backgroundColor: Colors.background.secondary,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: Spacing.base,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.default,
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.glass.background,
-    borderWidth: 1,
-    borderColor: Colors.glass.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  shareButton: {
-    width: 40,
-    height: 40,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.glass.background,
-    borderWidth: 1,
-    borderColor: Colors.glass.border,
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'center',
   },
   headerTitle: {
     fontSize: Typography.fontSize.lg,
-    fontWeight: '700',
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.text.primary,
   },
-  productCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  shareButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  scrollContent: {
+    padding: Spacing.base,
     gap: Spacing.base,
-    backgroundColor: Colors.glass.background,
-    borderWidth: 1,
-    borderColor: Colors.glass.border,
+    paddingBottom: Spacing['4xl'],
+  },
+  card: {
+    backgroundColor: Colors.white,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
+    ...Shadows.card,
   },
-  productIconWrap: {
-    width: 48,
-    height: 48,
+  productRow: {
+    flexDirection: 'row',
+    gap: Spacing.lg,
+  },
+  productImage: {
+    width: 80,
+    height: 80,
     borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.glass.backgroundHover,
+    backgroundColor: Colors.gray[100],
+  },
+  productImagePlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.gray[100],
     alignItems: 'center',
     justifyContent: 'center',
   },
   productInfo: {
     flex: 1,
-    gap: Spacing.xs,
+    justifyContent: 'center',
   },
   productName: {
-    fontSize: Typography.fontSize.xl,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.text.primary,
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    marginBottom: 2,
   },
   productCategory: {
     fontSize: Typography.fontSize.sm,
     color: Colors.text.secondary,
     textTransform: 'capitalize',
   },
-  assessmentCard: {
-    backgroundColor: Colors.glass.background,
-    borderWidth: 1,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
-    gap: Spacing.md,
+  badgeWrap: {
+    marginTop: Spacing.sm,
   },
-  assessmentBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    alignSelf: 'flex-start',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-  },
-  assessmentLabel: {
-    fontSize: Typography.fontSize.md,
-    fontWeight: '700',
-  },
-  assessmentDescription: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.text.secondary,
-    lineHeight: 20,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  assessmentAction: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.text.tertiary,
-    fontStyle: 'italic',
-    flex: 1,
-  },
-  confidenceCard: {
-    backgroundColor: Colors.glass.background,
-    borderWidth: 1,
-    borderColor: Colors.glass.border,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.base,
-    gap: Spacing.sm,
-  },
-  confidenceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  confidenceLabel: {
-    flex: 1,
-    fontSize: Typography.fontSize.sm,
-    color: Colors.text.secondary,
-  },
-  confidenceValue: {
-    fontSize: Typography.fontSize.sm,
-    fontWeight: '600',
-    color: Colors.text.primary,
-  },
-  section: {
-    gap: Spacing.md,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: Typography.fontSize.md,
-    fontWeight: '700',
-    color: Colors.text.primary,
-  },
-  findingCard: {
-    backgroundColor: Colors.glass.background,
-    borderWidth: 1,
-    borderColor: Colors.glass.border,
-    borderRadius: BorderRadius.md,
-    borderLeftWidth: 3,
-    padding: Spacing.md,
-    gap: Spacing.xs,
-  },
-  findingHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  findingIngredient: {
-    fontSize: Typography.fontSize.base,
-    fontWeight: '600',
-    color: Colors.text.primary,
-  },
-  findingDescription: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.text.secondary,
-    lineHeight: 20,
-  },
-  evidenceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  findingEvidence: {
-    fontSize: Typography.fontSize.xs,
-    color: Colors.text.tertiary,
-  },
-  findingSource: {
-    fontSize: Typography.fontSize.xs,
-    color: Colors.text.tertiary,
-    fontStyle: 'italic',
-  },
-  severityBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
-  },
-  severityText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  allergenBanner: {
-    backgroundColor: Colors.semantic.allergenBg,
-    borderWidth: 1,
-    borderColor: Colors.semantic.allergen,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.base,
-    gap: Spacing.sm,
-  },
-  allergenTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  allergenTitle: {
-    fontSize: Typography.fontSize.base,
-    fontWeight: '700',
-    color: Colors.status.caution,
-  },
-  allergenList: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.status.cautionLight,
-    textTransform: 'capitalize',
+  divider: {
+    height: 1,
+    backgroundColor: Colors.border.default,
+    marginVertical: Spacing.lg,
   },
   explanationText: {
     fontSize: Typography.fontSize.base,
-    color: Colors.text.secondary,
     lineHeight: 24,
+    color: Colors.text.primary,
   },
-  disclaimer: {
+  confidenceRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.sm,
-    backgroundColor: Colors.glass.background,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.base,
-    marginTop: Spacing.md,
+    justifyContent: 'space-around',
   },
-  disclaimerText: {
-    flex: 1,
+  confidenceItem: {
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  confidenceLabel: {
     fontSize: Typography.fontSize.xs,
     color: Colors.text.tertiary,
-    lineHeight: 18,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  alertCard: {
+    backgroundColor: Colors.status.concernBg,
+    borderColor: Colors.status.concern,
+    borderWidth: 1,
+  },
+  alertHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  alertTitle: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.status.concern,
+  },
+  alertText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.status.concern,
+    lineHeight: 20,
+  },
+  alertHighlight: {
+    fontWeight: Typography.fontWeight.bold,
+  },
+  sectionTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.text.primary,
+    marginBottom: Spacing.md,
+  },
+  emptyList: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
+  },
+  emptyListText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.text.secondary,
+  },
+  ingredientList: {
+    gap: Spacing.lg,
+  },
+  ingredientItem: {
+    gap: 4,
+  },
+  ingredientHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  ingredientName: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.text.primary,
+  },
+  ingredientDesc: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.text.secondary,
+    lineHeight: 20,
+  },
+  severityPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.sm,
+  },
+  sevCritical: { backgroundColor: Colors.status.concernBg },
+  sevHigh: { backgroundColor: Colors.status.concernBg },
+  sevMod: { backgroundColor: Colors.status.cautionBg },
+  severityText: {
+    fontSize: 10,
+    fontWeight: Typography.fontWeight.bold,
+    textTransform: 'uppercase',
+  },
+  errorContainer: {
+    flex: 1,
+    backgroundColor: Colors.white,
+  },
+  errorContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.xl,
+    gap: Spacing.md,
+  },
+  errorTitle: {
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.text.primary,
+  },
+  errorText: {
+    fontSize: Typography.fontSize.base,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+    backgroundColor: Colors.primary[600],
+    borderRadius: BorderRadius.md,
+  },
+  retryText: {
+    color: Colors.white,
+    fontWeight: Typography.fontWeight.semibold,
   },
 });

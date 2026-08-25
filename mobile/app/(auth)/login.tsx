@@ -1,5 +1,5 @@
 /**
- * SafeScan — Login Screen (with real icons)
+ * SafeScan — Login Screen
  */
 
 import { useState } from 'react';
@@ -11,18 +11,26 @@ import { useAuthStore } from '../../stores/useAuthStore';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, loginWithGoogle, loginWithApple, isLoading, error, clearError } = useAuthStore();
-
+  const { login, loginWithGoogle } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) return;
+    if (!email || !password) {
+      setError('Please enter your email and password.');
+      return;
+    }
+    setIsLoading(true);
+    setError('');
     try {
-      await login(email.trim(), password);
-    } catch {
-      // Error handled in store
+      await login(email, password);
+    } catch (err: any) {
+      setError(err?.message || 'Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -34,38 +42,36 @@ export default function LoginScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={20} color={Colors.text.primary} />
           </Pressable>
-          <Text style={styles.title}>Welcome Back</Text>
-          <Text style={styles.subtitle}>Sign in to access your scan history</Text>
+          <Text style={styles.title}>Welcome back</Text>
+          <Text style={styles.subtitle}>Sign in to your SafeScan account</Text>
         </View>
 
         {/* Form */}
         <View style={styles.form}>
-          {error && (
+          {error ? (
             <View style={styles.errorBanner}>
-              <Ionicons name="alert-circle" size={18} color={Colors.status.concernLight} />
+              <Ionicons name="alert-circle" size={18} color={Colors.status.concern} />
               <Text style={styles.errorText}>{error}</Text>
-              <Pressable onPress={clearError}>
-                <Ionicons name="close" size={18} color={Colors.status.concernLight} />
-              </Pressable>
             </View>
-          )}
+          ) : null}
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Email</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="mail-outline" size={18} color={Colors.text.tertiary} style={styles.inputIcon} />
+            <View style={styles.inputWrap}>
+              <Ionicons name="mail-outline" size={18} color={Colors.gray[400]} />
               <TextInput
                 style={styles.input}
+                placeholder="you@example.com"
+                placeholderTextColor={Colors.gray[400]}
                 value={email}
                 onChangeText={setEmail}
-                placeholder="you@example.com"
-                placeholderTextColor={Colors.text.tertiary}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -75,33 +81,34 @@ export default function LoginScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Password</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={18} color={Colors.text.tertiary} style={styles.inputIcon} />
+            <View style={styles.inputWrap}>
+              <Ionicons name="lock-closed-outline" size={18} color={Colors.gray[400]} />
               <TextInput
                 style={styles.input}
+                placeholder="Enter your password"
+                placeholderTextColor={Colors.gray[400]}
                 value={password}
                 onChangeText={setPassword}
-                placeholder="Enter your password"
-                placeholderTextColor={Colors.text.tertiary}
                 secureTextEntry={!showPassword}
               />
-              <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
-                <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={Colors.text.tertiary} />
+              <Pressable onPress={() => setShowPassword(!showPassword)}>
+                <Ionicons
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={18}
+                  color={Colors.gray[400]}
+                />
               </Pressable>
             </View>
           </View>
 
           <Pressable
-            style={({ pressed }) => [styles.button, styles.buttonPrimary, pressed && styles.buttonPressed]}
+            style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed, isLoading && styles.buttonDisabled]}
             onPress={handleLogin}
             disabled={isLoading}
           >
-            {isLoading ? (
-              <Ionicons name="sync" size={20} color={Colors.white} />
-            ) : (
-              <Ionicons name="log-in-outline" size={20} color={Colors.white} />
-            )}
-            <Text style={styles.buttonText}>{isLoading ? 'Signing in…' : 'Sign In'}</Text>
+            <Text style={styles.primaryButtonText}>
+              {isLoading ? 'Signing in…' : 'Sign In'}
+            </Text>
           </Pressable>
 
           {/* Divider */}
@@ -111,32 +118,30 @@ export default function LoginScreen() {
             <View style={styles.dividerLine} />
           </View>
 
-          {/* Social Auth */}
+          {/* Social logins */}
           <Pressable
-            style={({ pressed }) => [styles.button, styles.buttonSocial, pressed && styles.buttonPressed]}
+            style={({ pressed }) => [styles.socialButton, pressed && styles.buttonPressed]}
             onPress={loginWithGoogle}
-            disabled={isLoading}
           >
-            <Ionicons name="logo-google" size={20} color="#4285F4" />
+            <Ionicons name="logo-google" size={18} color={Colors.text.primary} />
             <Text style={styles.socialButtonText}>Continue with Google</Text>
           </Pressable>
 
           <Pressable
-            style={({ pressed }) => [styles.button, styles.buttonSocial, pressed && styles.buttonPressed]}
-            onPress={loginWithApple}
-            disabled={isLoading}
+            style={({ pressed }) => [styles.socialButton, pressed && styles.buttonPressed]}
           >
-            <Ionicons name="logo-apple" size={20} color={Colors.white} />
+            <Ionicons name="logo-apple" size={18} color={Colors.text.primary} />
             <Text style={styles.socialButtonText}>Continue with Apple</Text>
           </Pressable>
         </View>
 
         {/* Footer */}
-        <Pressable onPress={() => router.push('/(auth)/register')} style={styles.footer}>
-          <Text style={styles.footerText}>
-            Don't have an account? <Text style={styles.footerAccent}>Create one</Text>
-          </Text>
-        </Pressable>
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Don't have an account?</Text>
+          <Pressable onPress={() => router.replace('/(auth)/register')}>
+            <Text style={styles.footerLink}>Sign Up</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -149,31 +154,27 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: Spacing['2xl'],
-    paddingTop: 60,
-    paddingBottom: 40,
-    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing['3xl'],
+    paddingBottom: Spacing['2xl'],
   },
   header: {
-    gap: Spacing.sm,
-    marginBottom: Spacing['3xl'],
+    gap: Spacing.xs,
+    marginBottom: Spacing['2xl'],
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.glass.background,
-    borderWidth: 1,
-    borderColor: Colors.glass.border,
+    backgroundColor: Colors.gray[100],
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.base,
   },
   title: {
-    fontSize: Typography.fontSize['3xl'],
-    fontWeight: '700',
+    fontSize: Typography.fontSize['2xl'],
+    fontWeight: Typography.fontWeight.heavy,
     color: Colors.text.primary,
-    letterSpacing: Typography.letterSpacing.tight,
   },
   subtitle: {
     fontSize: Typography.fontSize.base,
@@ -183,73 +184,62 @@ const styles = StyleSheet.create({
     gap: Spacing.base,
   },
   errorBanner: {
-    backgroundColor: Colors.semantic.riskBg,
-    borderWidth: 1,
-    borderColor: Colors.semantic.risk,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+    backgroundColor: Colors.status.concernBg,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
   },
   errorText: {
     flex: 1,
-    color: Colors.status.concernLight,
     fontSize: Typography.fontSize.sm,
+    color: Colors.status.concern,
   },
   inputGroup: {
     gap: Spacing.xs,
   },
   label: {
     fontSize: Typography.fontSize.sm,
-    fontWeight: '500',
-    color: Colors.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: Typography.letterSpacing.wider,
+    fontWeight: Typography.fontWeight.medium,
+    color: Colors.text.primary,
   },
-  inputWrapper: {
+  inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 52,
-    backgroundColor: Colors.glass.background,
+    height: 48,
+    backgroundColor: Colors.gray[50],
     borderWidth: 1,
-    borderColor: Colors.glass.border,
+    borderColor: Colors.border.default,
     borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.md,
-  },
-  inputIcon: {
-    marginRight: Spacing.sm,
+    gap: Spacing.sm,
   },
   input: {
     flex: 1,
-    color: Colors.text.primary,
     fontSize: Typography.fontSize.base,
-    height: '100%',
+    color: Colors.text.primary,
   },
-  eyeButton: {
-    padding: Spacing.xs,
-  },
-  button: {
-    height: 54,
+  primaryButton: {
+    height: 52,
+    backgroundColor: Colors.primary[600],
     borderRadius: BorderRadius.lg,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+    ...Shadows.md,
+  },
+  primaryButtonText: {
+    fontSize: Typography.fontSize.md,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.white,
   },
   buttonPressed: {
     opacity: 0.85,
     transform: [{ scale: 0.98 }],
   },
-  buttonPrimary: {
-    backgroundColor: Colors.accent.primary,
-    marginTop: Spacing.sm,
-    ...Shadows.md,
-  },
-  buttonText: {
-    fontSize: Typography.fontSize.md,
-    fontWeight: '600',
-    color: Colors.white,
+  buttonDisabled: {
+    opacity: 0.6,
   },
   divider: {
     flexDirection: 'row',
@@ -266,27 +256,37 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.sm,
     color: Colors.text.tertiary,
   },
-  buttonSocial: {
-    backgroundColor: Colors.glass.background,
+  socialButton: {
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.glass.borderLight,
+    borderColor: Colors.border.default,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.white,
   },
   socialButtonText: {
     fontSize: Typography.fontSize.base,
-    fontWeight: '500',
+    fontWeight: Typography.fontWeight.medium,
     color: Colors.text.primary,
   },
   footer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing.lg,
-    marginTop: Spacing['2xl'],
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    marginTop: 'auto',
+    paddingTop: Spacing['2xl'],
   },
   footerText: {
     fontSize: Typography.fontSize.sm,
     color: Colors.text.secondary,
   },
-  footerAccent: {
-    color: Colors.accent.primaryLight,
-    fontWeight: '600',
+  footerLink: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.primary[600],
   },
 });
