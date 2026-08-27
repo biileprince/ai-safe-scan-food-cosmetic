@@ -1,7 +1,7 @@
 /**
  * SafeScan — Root Layout
  * 
- * Global providers: fonts, theme, auth initialization.
+ * Global providers: error boundary, offline status, auth initialization.
  * Routes unauthenticated users to (auth) group, authenticated to (tabs).
  */
 
@@ -11,13 +11,17 @@ import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useProfileStore } from '../stores/useProfileStore';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { Colors } from '../constants/theme';
+import ErrorBoundary from '../components/ui/ErrorBoundary';
+import OfflineBanner from '../components/ui/OfflineBanner';
 
 export default function RootLayout() {
   const { user, isAuthenticated, isLoading, initialize } = useAuthStore();
   const { ensureProfile } = useProfileStore();
   const router = useRouter();
   const segments = useSegments();
+  const { isConnected } = useNetworkStatus();
 
   // Initialize auth on app launch
   useEffect(() => {
@@ -49,16 +53,17 @@ export default function RootLayout() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary[600]} />
-        <StatusBar style="light" />
+        <StatusBar style="dark" />
       </View>
     );
   }
 
   return (
-    <>
-      <StatusBar style="light" />
+    <ErrorBoundary>
+      <OfflineBanner visible={!isConnected} />
+      <StatusBar style="dark" />
       <Slot />
-    </>
+    </ErrorBoundary>
   );
 }
 
