@@ -40,7 +40,8 @@
           "photosPermission": "SafeScan needs photo library access to select product images for analysis."
         }
       ],
-      "expo-splash-screen"
+      "expo-splash-screen",
+      "expo-image"
     ]
   }
 }

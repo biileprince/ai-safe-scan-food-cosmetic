@@ -130,6 +130,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       await authService.logout();
+    } catch (err) {
+      // Ignore network or missing session errors. We just want to clear local state.
+      console.warn('Logout warning:', err);
     } finally {
       set({ user: null, isAuthenticated: false, isLoading: false, error: null });
     }

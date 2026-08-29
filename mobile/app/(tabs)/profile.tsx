@@ -1,64 +1,22 @@
 /**
- * SafeScan — Profile Tab
+ * SafeScan — Profile Tab (Account Settings)
  */
 
-import { View, Text, Pressable, ScrollView, StyleSheet, Alert } from 'react-native';
+import React from 'react';
+import { View, Text, Pressable, ScrollView, StyleSheet, Alert, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useProfileStore } from '../../stores/useProfileStore';
 
-type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
-
-const JURISDICTIONS = [
-  { code: 'NG', label: 'Nigeria', flag: '🇳🇬' },
-  { code: 'KE', label: 'Kenya', flag: '🇰🇪' },
-  { code: 'ZA', label: 'South Africa', flag: '🇿🇦' },
-  { code: 'GH', label: 'Ghana', flag: '🇬🇭' },
-  { code: 'US', label: 'United States', flag: '🇺🇸' },
-  { code: 'EU', label: 'European Union', flag: '🇪🇺' },
-];
-
-const ALLERGENS = [
-  { key: 'milk', label: 'Milk / Dairy' },
-  { key: 'eggs', label: 'Eggs' },
-  { key: 'peanuts', label: 'Peanuts' },
-  { key: 'tree_nuts', label: 'Tree Nuts' },
-  { key: 'wheat_gluten', label: 'Wheat / Gluten' },
-  { key: 'soy', label: 'Soy' },
-  { key: 'fish', label: 'Fish' },
-  { key: 'shellfish', label: 'Shellfish' },
-  { key: 'sesame', label: 'Sesame' },
-];
-
-const DIETARY = [
-  { key: 'vegan', label: 'Vegan' },
-  { key: 'vegetarian', label: 'Vegetarian' },
-  { key: 'halal', label: 'Halal' },
-  { key: 'kosher', label: 'Kosher' },
-  { key: 'keto', label: 'Keto' },
-  { key: 'gluten_free', label: 'Gluten Free' },
-  { key: 'dairy_free', label: 'Dairy Free' },
-  { key: 'organic', label: 'Organic Only' },
-];
-
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
-  const { profile, updateAllergens, updateDietaryPrefs, updateJurisdiction } = useProfileStore();
+  const { profile, updateDietaryPrefs } = useProfileStore();
 
-  const selectedAllergens = profile?.allergens || [];
   const selectedDietary = profile?.dietaryPrefs || [];
-  const selectedJurisdiction = profile?.jurisdiction || 'NG';
 
-  const toggleAllergen = (key: string) => {
-    const updated = selectedAllergens.includes(key)
-      ? selectedAllergens.filter(a => a !== key)
-      : [...selectedAllergens, key];
-    updateAllergens(updated);
-  };
-
-  const toggleDietary = (key: string) => {
+  const handleToggle = (key: string) => {
     const updated = selectedDietary.includes(key)
       ? selectedDietary.filter(d => d !== key)
       : [...selectedDietary, key];
@@ -72,100 +30,112 @@ export default function ProfileScreen() {
     ]);
   };
 
+  const isEnabled = (key: string) => selectedDietary.includes(key);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Account Settings</Text>
+      </View>
+
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* User card */}
-        <View style={styles.userCard}>
+        <View style={styles.userSection}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
               {(user?.name || 'U').charAt(0).toUpperCase()}
             </Text>
           </View>
-          <View style={styles.userInfo}>
-            <Text style={styles.userName}>{user?.name || 'User'}</Text>
-            <Text style={styles.userEmail}>{user?.email || ''}</Text>
+          <Text style={styles.userName}>{user?.name || 'User'}</Text>
+          <Text style={styles.userEmail}>{user?.email || 'user@example.com'}</Text>
+          <View style={styles.proBadge}>
+            <Text style={styles.proBadgeText}>PRO MEMBER</Text>
           </View>
         </View>
 
-        {/* Jurisdiction */}
+        {/* Dietary Restrictions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Regulatory Region</Text>
-          <Text style={styles.sectionSubtitle}>Safety standards used for assessments</Text>
-          <View style={styles.chipGrid}>
-            {JURISDICTIONS.map(j => (
-              <Pressable
-                key={j.code}
-                style={[styles.chip, selectedJurisdiction === j.code && styles.chipActive]}
-                onPress={() => updateJurisdiction(j.code)}
-              >
-                <Text style={styles.chipFlag}>{j.flag}</Text>
-                <Text style={[styles.chipText, selectedJurisdiction === j.code && styles.chipTextActive]}>
-                  {j.label}
-                </Text>
-                {selectedJurisdiction === j.code && (
-                  <Ionicons name="checkmark" size={14} color={Colors.primary[600]} />
-                )}
-              </Pressable>
-            ))}
+          <Text style={styles.sectionTitle}>DIETARY RESTRICTIONS</Text>
+          
+          <View style={styles.settingItem}>
+            <Text style={styles.settingText}>Vegan Diet Compliance</Text>
+            <Switch
+              trackColor={{ false: Colors.gray[200], true: Colors.primary[500] }}
+              thumbColor={Colors.white}
+              onValueChange={() => handleToggle('vegan')}
+              value={isEnabled('vegan')}
+            />
+          </View>
+
+          <View style={styles.settingItem}>
+            <Text style={styles.settingText}>Gluten-Free Standard</Text>
+            <Switch
+              trackColor={{ false: Colors.gray[200], true: Colors.primary[500] }}
+              thumbColor={Colors.white}
+              onValueChange={() => handleToggle('gluten_free')}
+              value={isEnabled('gluten_free')}
+            />
+          </View>
+
+          <View style={styles.settingItem}>
+            <Text style={styles.settingText}>Nut Allergy Severe Alert</Text>
+            <Switch
+              trackColor={{ false: Colors.gray[200], true: Colors.primary[500] }}
+              thumbColor={Colors.white}
+              onValueChange={() => handleToggle('nut_allergy')}
+              value={isEnabled('nut_allergy')}
+            />
+          </View>
+
+          <View style={styles.settingItem}>
+            <Text style={styles.settingText}>Halal Ingredient Match</Text>
+            <Switch
+              trackColor={{ false: Colors.gray[200], true: Colors.primary[500] }}
+              thumbColor={Colors.white}
+              onValueChange={() => handleToggle('halal')}
+              value={isEnabled('halal')}
+            />
           </View>
         </View>
 
-        {/* Allergens */}
+        {/* Other Settings */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Allergen Alerts</Text>
-          <Text style={styles.sectionSubtitle}>Get warnings when these are detected</Text>
-          <View style={styles.chipGrid}>
-            {ALLERGENS.map(a => {
-              const selected = selectedAllergens.includes(a.key);
-              return (
-                <Pressable
-                  key={a.key}
-                  style={[styles.chip, selected && styles.chipDanger]}
-                  onPress={() => toggleAllergen(a.key)}
-                >
-                  <Text style={[styles.chipText, selected && styles.chipTextDanger]}>{a.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Dietary */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Dietary Preferences</Text>
-          <Text style={styles.sectionSubtitle}>Filter products by diet</Text>
-          <View style={styles.chipGrid}>
-            {DIETARY.map(d => {
-              const selected = selectedDietary.includes(d.key);
-              return (
-                <Pressable
-                  key={d.key}
-                  style={[styles.chip, selected && styles.chipActive]}
-                  onPress={() => toggleDietary(d.key)}
-                >
-                  <Text style={[styles.chipText, selected && styles.chipTextActive]}>{d.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <Pressable style={styles.menuItem}>
+            <Ionicons name="notifications-outline" size={20} color={Colors.text.primary} style={styles.menuIcon} />
+            <Text style={styles.menuText}>Notification Settings</Text>
+            <Ionicons name="chevron-forward" size={20} color={Colors.text.tertiary} />
+          </Pressable>
+          <View style={styles.divider} />
+          <Pressable style={styles.menuItem}>
+            <Ionicons name="information-circle-outline" size={20} color={Colors.text.primary} style={styles.menuIcon} />
+            <Text style={styles.menuText}>About SafeScan AI</Text>
+            <Ionicons name="chevron-forward" size={20} color={Colors.text.tertiary} />
+          </Pressable>
+          <View style={styles.divider} />
+          <Pressable style={styles.menuItem}>
+            <Ionicons name="mail-outline" size={20} color={Colors.text.primary} style={styles.menuIcon} />
+            <Text style={styles.menuText}>Contact Scientific Board</Text>
+            <Ionicons name="chevron-forward" size={20} color={Colors.text.tertiary} />
+          </Pressable>
         </View>
 
         {/* Sign out */}
-        <Pressable
-          style={({ pressed }) => [styles.logoutButton, pressed && { opacity: 0.8 }]}
-          onPress={handleLogout}
-        >
-          <Ionicons name="log-out-outline" size={18} color={Colors.status.concern} />
-          <Text style={styles.logoutText}>Sign Out</Text>
-        </Pressable>
+        <View style={styles.logoutContainer}>
+           <Pressable
+             style={({ pressed }) => [styles.logoutButton, pressed && { opacity: 0.8 }]}
+             onPress={handleLogout}
+           >
+             <Ionicons name="log-out-outline" size={18} color={Colors.status.concern} />
+             <Text style={styles.logoutText}>Sign Out</Text>
+           </Pressable>
+        </View>
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>SafeScan v1.0.0</Text>
           <Text style={styles.footerHint}>
-            Assessments are informational and not a substitute for professional advice.
+            Assessments are powered by validated toxicological data and do not substitute for individual clinical advice.
           </Text>
+          <Text style={styles.footerText}>SafeScan v3.1.2-clinical</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -175,113 +145,131 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background.secondary,
+    backgroundColor: Colors.gray[50], // Slightly lighter gray for native feel
+  },
+  header: {
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.text.primary,
   },
   scrollContent: {
-    padding: Spacing.base,
-    paddingBottom: Spacing['4xl'],
-    gap: Spacing.base,
-  },
-  userCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.base,
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
-    ...Shadows.card,
+    paddingBottom: Spacing['4xl'],
+    gap: Spacing.xl,
+  },
+  userSection: {
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
   },
   avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: Colors.primary[600],
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.primary[100],
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: Spacing.md,
+    borderWidth: 2,
+    borderColor: Colors.primary[200],
   },
   avatarText: {
-    fontSize: Typography.fontSize.xl,
+    fontSize: Typography.fontSize['3xl'],
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.white,
-  },
-  userInfo: {
-    flex: 1,
+    color: Colors.primary[700],
   },
   userName: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.semibold,
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.text.primary,
+    marginBottom: 4,
   },
   userEmail: {
     fontSize: Typography.fontSize.sm,
     color: Colors.text.secondary,
-    marginTop: 2,
+    marginBottom: Spacing.md,
+  },
+  proBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    backgroundColor: 'transparent',
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: Colors.primary[500],
+  },
+  proBadgeText: {
+    fontSize: 10,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.primary[600],
+    letterSpacing: 0.5,
   },
   section: {
     backgroundColor: Colors.white,
     borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
-    gap: Spacing.md,
-    ...Shadows.card,
+    padding: Spacing.md,
+    ...Shadows.sm,
+    borderWidth: 1,
+    borderColor: Colors.gray[100],
   },
   sectionTitle: {
-    fontSize: Typography.fontSize.md,
+    fontSize: 13,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.text.primary,
-  },
-  sectionSubtitle: {
-    fontSize: Typography.fontSize.sm,
     color: Colors.text.tertiary,
-    marginTop: -4,
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.xs,
+    letterSpacing: 0.5,
   },
-  chipGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  chip: {
+  settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.gray[50],
-    borderWidth: 1,
-    borderColor: Colors.border.default,
-    borderRadius: BorderRadius.full,
-    paddingHorizontal: Spacing.md,
+    justifyContent: 'space-between',
     paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
   },
-  chipActive: {
-    backgroundColor: Colors.primary[50],
-    borderColor: Colors.primary[600],
-  },
-  chipDanger: {
-    backgroundColor: Colors.status.cautionBg,
-    borderColor: Colors.status.caution,
-  },
-  chipFlag: {
-    fontSize: 16,
-  },
-  chipText: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.text.secondary,
+  settingText: {
+    fontSize: Typography.fontSize.md,
+    color: Colors.text.primary,
     fontWeight: Typography.fontWeight.medium,
   },
-  chipTextActive: {
-    color: Colors.primary[700],
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xs,
   },
-  chipTextDanger: {
-    color: Colors.status.caution,
+  menuIcon: {
+    marginRight: Spacing.md,
+  },
+  menuText: {
+    flex: 1,
+    fontSize: Typography.fontSize.md,
+    color: Colors.text.primary,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.gray[100],
+    marginLeft: 36, // Align with text
+  },
+  logoutContainer: {
+    marginTop: Spacing.sm,
+    paddingHorizontal: Spacing.xl,
   },
   logoutButton: {
     height: 48,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.full,
     borderWidth: 1,
-    borderColor: Colors.status.concern,
-    backgroundColor: Colors.status.concernBg,
+    borderColor: Colors.status.concernBg,
+    backgroundColor: Colors.white,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.sm,
+    ...Shadows.sm,
   },
   logoutText: {
     fontSize: Typography.fontSize.base,
@@ -290,19 +278,19 @@ const styles = StyleSheet.create({
   },
   footer: {
     alignItems: 'center',
-    gap: Spacing.xs,
-    paddingTop: Spacing.base,
-  },
-  footerText: {
-    fontSize: Typography.fontSize.xs,
-    color: Colors.text.tertiary,
-    fontWeight: Typography.fontWeight.medium,
+    gap: Spacing.sm,
+    paddingTop: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
   },
   footerHint: {
-    fontSize: Typography.fontSize.xs,
+    fontSize: 12,
     color: Colors.text.tertiary,
     textAlign: 'center',
-    lineHeight: 16,
-    paddingHorizontal: Spacing.xl,
+    lineHeight: 18,
+  },
+  footerText: {
+    fontSize: 12,
+    color: Colors.text.tertiary,
+    fontWeight: Typography.fontWeight.medium,
   },
 });

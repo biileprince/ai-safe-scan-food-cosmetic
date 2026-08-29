@@ -462,6 +462,49 @@ async function main() {
   console.log(`\n🌱 SafeScan Ingredient Seeder`);
   console.log(`   Database: ${DB_ID}`);
   console.log(`   Collection: ${COLLECTION_ID}`);
+  
+  // 1. Create DB if it doesn't exist
+  try {
+    await databases.get(DB_ID);
+    console.log(`  ✅ Database ${DB_ID} exists`);
+  } catch (err) {
+    if (err.code === 404) {
+      console.log(`  🔨 Creating Database ${DB_ID}...`);
+      await databases.create(DB_ID, 'SafeScan Database');
+    } else {
+      throw err;
+    }
+  }
+
+  // 2. Create Collection if it doesn't exist
+  try {
+    await databases.getCollection(DB_ID, COLLECTION_ID);
+    console.log(`  ✅ Collection ${COLLECTION_ID} exists`);
+  } catch (err) {
+    if (err.code === 404) {
+      console.log(`  🔨 Creating Collection ${COLLECTION_ID}...`);
+      await databases.createCollection(DB_ID, COLLECTION_ID, 'Ingredients');
+      
+      // Create attributes
+      console.log(`  🔨 Creating Attributes...`);
+      await databases.createStringAttribute(DB_ID, COLLECTION_ID, 'name', 255, true);
+      await databases.createStringAttribute(DB_ID, COLLECTION_ID, 'canonicalName', 255, true);
+      await databases.createStringAttribute(DB_ID, COLLECTION_ID, 'category', 255, true);
+      await databases.createStringAttribute(DB_ID, COLLECTION_ID, 'productType', 255, true);
+      await databases.createStringAttribute(DB_ID, COLLECTION_ID, 'riskLevel', 255, true);
+      await databases.createStringAttribute(DB_ID, COLLECTION_ID, 'description', 2048, true);
+      await databases.createStringAttribute(DB_ID, COLLECTION_ID, 'regulatoryStatus', 4096, true);
+      await databases.createStringAttribute(DB_ID, COLLECTION_ID, 'evidenceSources', 4096, true);
+      await databases.createStringAttribute(DB_ID, COLLECTION_ID, 'allergenPotential', 255, true);
+      await databases.createBooleanAttribute(DB_ID, COLLECTION_ID, 'isBeneficial', true);
+      
+      console.log(`  ⏳ Waiting 5 seconds for attributes to be created...`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    } else {
+      throw err;
+    }
+  }
+
   console.log(`   Ingredients to seed: ${ALL_INGREDIENTS.length}\n`);
 
   let created = 0;
