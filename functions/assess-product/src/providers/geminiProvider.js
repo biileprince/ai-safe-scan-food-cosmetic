@@ -12,7 +12,7 @@ export class GeminiProvider extends AIProvider {
   constructor(apiKey, config = {}) {
     super(apiKey, config);
     this.client = new GoogleGenAI({ apiKey });
-    this.model = config.model || 'gemini-3.6-flash';
+    this.model = config.model || 'gemini-2.5-flash';
   }
 
   getName() {
