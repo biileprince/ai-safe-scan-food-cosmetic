@@ -1,258 +1,282 @@
-/**
- * SafeScan — Welcome Screen
- * 
- * Clean, professional onboarding with smooth animations and imagery.
- */
-
 import React, { useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Dimensions, ImageBackground } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Carousel } from 'react-native-reanimated-carousel'; // @ts-ignore
+import Animated, { useAnimatedStyle, withTiming, withRepeat, useSharedValue, Easing } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { 
-  FadeIn, 
-  FadeInDown, 
-  FadeInUp,
-  useAnimatedScrollHandler,
-  useSharedValue,
-  useAnimatedStyle,
-  interpolate,
-  Extrapolate
-} from 'react-native-reanimated';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
-import { Image } from 'expo-image';
+import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
+import Button from '../../components/ui/Button';
 
-const { width, height } = Dimensions.get('window');
-
-const ONBOARDING_DATA = [
+const SLIDES = [
   {
-    id: '1',
-    title: "Know what's in your products.",
-    subtitle: "Scan any food or cosmetic label and get instant, evidence-based safety insights.",
-    image: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?auto=format&fit=crop&w=800&q=80',
-    icon: 'scan-outline'
+    title: 'Point. Snap. Know.',
+    desc: 'Photograph any food or cosmetic label — SafeScan takes it from there.',
+    icon: 'camera-outline' as const,
   },
   {
-    id: '2',
-    title: "Backed by Science.",
-    subtitle: "Cross-references ingredients against FDA, EU, NAFDAC, and SAHPRA regulations.",
-    image: 'https://images.unsplash.com/photo-1581093458791-9f3c3900df4b?auto=format&fit=crop&w=800&q=80',
-    icon: 'shield-checkmark-outline'
+    title: 'AI reads every ingredient',
+    desc: 'Vision OCR extracts full ingredient lists in seconds — even the fine print.',
+    icon: 'scan-outline' as const,
   },
   {
-    id: '3',
-    title: "Personalized Alerts.",
-    subtitle: "Set up your health profile to get flagged for your specific allergies and dietary restrictions.",
-    image: 'https://images.unsplash.com/photo-1542281286-9e0a16bb7366?auto=format&fit=crop&w=800&q=80',
-    icon: 'person-outline'
+    title: 'Checked against real regulators',
+    desc: 'Cross-referenced with NAFDAC, FDA, EU CosIng, KEBS and SAHPRA.',
+    icon: 'shield-checkmark-outline' as const,
+    chips: ['NAFDAC', 'FDA', 'EU CosIng', 'KEBS', 'SAHPRA'],
+  },
+  {
+    title: 'Get a clear verdict',
+    desc: 'A plain 0–100 score with the evidence behind it — no guesswork, no jargon.',
+    icon: 'checkmark-circle-outline' as const,
   }
 ];
 
 export default function WelcomeScreen() {
+  const { width, height } = useWindowDimensions();
   const router = useRouter();
-  const scrollX = useSharedValue(0);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const carouselRef = useRef<any>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
 
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      scrollX.value = event.contentOffset.x;
-    },
-  });
+  const drift1 = useSharedValue(0);
+  const drift2 = useSharedValue(0);
 
-  const handleScroll = (event: any) => {
-    const slideSize = event.nativeEvent.layoutMeasurement.width;
-    const index = event.nativeEvent.contentOffset.x / slideSize;
-    setCurrentIndex(Math.round(index));
+  React.useEffect(() => {
+    drift1.value = withRepeat(withTiming(1, { duration: 9000, easing: Easing.inOut(Easing.ease) }), -1, true);
+    drift2.value = withRepeat(withTiming(1, { duration: 11000, easing: Easing.inOut(Easing.ease) }), -1, true);
+  }, []);
+
+  const glowStyle1 = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: -14 * drift1.value },
+      { translateY: 16 * drift1.value },
+      { scale: 1 + 0.12 * drift1.value },
+    ],
+  }));
+
+  const glowStyle2 = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: 12 * drift2.value },
+      { translateY: -14 * drift2.value },
+      { scale: 1 + 0.08 * drift2.value },
+    ],
+  }));
+
+  const renderItem = ({ item }: { item: typeof SLIDES[0] }) => {
+    return (
+      <View style={styles.slideContainer}>
+        <Animated.View style={styles.iconContainer}>
+          <Ionicons name={item.icon} size={34} color={Colors.primary[300]} />
+        </Animated.View>
+        <Text style={styles.title}>{item.title}</Text>
+        <Text style={styles.desc}>{item.desc}</Text>
+        {item.chips && (
+          <View style={styles.chipsContainer}>
+            {item.chips.map(c => (
+              <View key={c} style={styles.chip}>
+                <Text style={styles.chipText}>{c}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    );
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <Animated.View entering={FadeIn.duration(800)} style={styles.carouselContainer}>
-        <Animated.ScrollView
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onScroll={scrollHandler}
-          scrollEventThrottle={16}
-          onMomentumScrollEnd={handleScroll}
-          bounces={false}
-        >
-          {ONBOARDING_DATA.map((item, index) => {
-            return (
-              <View key={item.id} style={styles.slide}>
-                <View style={styles.imageContainer}>
-                  <Image 
-                    source={{ uri: item.image }} 
-                    style={styles.image} 
-                    contentFit="cover"
-                    transition={500}
-                  />
-                  <View style={styles.overlay} />
-                </View>
-                
-                <View style={styles.slideContent}>
-                  <View style={styles.iconWrap}>
-                    <Ionicons name={item.icon as any} size={28} color={Colors.primary[600]} />
-                  </View>
-                  <Text style={styles.title}>{item.title}</Text>
-                  <Text style={styles.subtitle}>{item.subtitle}</Text>
-                </View>
-              </View>
-            );
-          })}
-        </Animated.ScrollView>
-      </Animated.View>
-
-      {/* Pagination Dots */}
-      <View style={styles.paginationContainer}>
-        {ONBOARDING_DATA.map((_, i) => {
-          const animatedDotStyle = useAnimatedStyle(() => {
-            const dotWidth = interpolate(
-              scrollX.value,
-              [(i - 1) * width, i * width, (i + 1) * width],
-              [8, 24, 8],
-              Extrapolate.CLAMP
-            );
-            const opacity = interpolate(
-              scrollX.value,
-              [(i - 1) * width, i * width, (i + 1) * width],
-              [0.3, 1, 0.3],
-              Extrapolate.CLAMP
-            );
-            return { width: dotWidth, opacity };
-          });
-
-          return (
-            <Animated.View key={i} style={[styles.dot, animatedDotStyle]} />
-          );
-        })}
+    <View style={styles.container}>
+      <View style={StyleSheet.absoluteFill}>
+        <LinearGradient
+          colors={['#0D3B1A', '#14532D', '#111827']}
+          start={{ x: 0.18, y: -0.1 }}
+          end={{ x: 1.2, y: 0.9 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <Animated.View style={[styles.glow1, glowStyle1]} />
+        <Animated.View style={[styles.glow2, glowStyle2]} />
       </View>
 
-      {/* Bottom Action Area */}
-      <Animated.View entering={FadeInUp.delay(500).duration(600)} style={styles.bottomContainer}>
-        <Pressable
-          style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
-          onPress={() => router.push('/(auth)/register')}
+      <View style={styles.skipContainer}>
+        <Pressable 
+          onPress={() => carouselRef.current?.scrollTo({ index: SLIDES.length - 1, animated: true })}
+          style={styles.skipButton}
         >
-          <Text style={styles.primaryButtonText}>Get Started</Text>
+          <Text style={styles.skipText}>Skip</Text>
         </Pressable>
+      </View>
 
-        <Pressable
-          style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
-          onPress={() => router.push('/(auth)/login')}
-        >
-          <Text style={styles.secondaryButtonText}>I already have an account</Text>
+      <View style={styles.carouselContainer}>
+        {width > 0 && (
+          <Carousel
+            ref={carouselRef}
+            width={width}
+            height={height * 0.45}
+            data={SLIDES}
+            autoPlay={true}
+            autoPlayInterval={3400}
+            loop={true}
+            onSnapToItem={(index: number) => setActiveIndex(index)}
+            renderItem={renderItem}
+            panGestureHandlerProps={{ activeOffsetX: [-10, 10] }}
+          />
+        )}
+      </View>
+
+      <View style={styles.paginationContainer}>
+        {SLIDES.map((_, i) => (
+          <View 
+            key={i} 
+            style={[styles.dot, i === activeIndex ? styles.activeDot : styles.inactiveDot]}
+          />
+        ))}
+      </View>
+
+      <View style={styles.actionContainer}>
+        {/* @ts-ignore */}
+        <Button label="Get started" onPress={() => router.push('/register')} style={{ marginTop: 24 }} />
+        <Pressable onPress={() => router.push('/login')} style={styles.loginContainer}>
+          <Text style={styles.loginText}>
+            Already scanning with us? <Text style={styles.loginTextBold}>Log in</Text>
+          </Text>
         </Pressable>
-      </Animated.View>
-    </SafeAreaView>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: '#111827',
+    overflow: 'hidden',
+  },
+  glow1: {
+    position: 'absolute',
+    top: -50,
+    right: -60,
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    backgroundColor: 'rgba(22, 163, 74, 0.45)',
+  },
+  glow2: {
+    position: 'absolute',
+    bottom: 120,
+    left: -50,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: 'rgba(245, 158, 11, 0.25)',
+  },
+  skipContainer: {
+    paddingTop: 56,
+    paddingHorizontal: 16,
+    alignItems: 'flex-end',
+    zIndex: 10,
+  },
+  skipButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  skipText: {
+    color: 'rgba(255, 255, 255, 0.65)',
+    fontWeight: '600',
+    fontSize: 11.5,
   },
   carouselContainer: {
     flex: 1,
+    marginTop: 32,
+    zIndex: 10,
   },
-  slide: {
-    width,
+  slideContainer: {
     flex: 1,
-    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingTop: 40,
   },
-  imageContainer: {
-    width,
-    height: height * 0.65, // Use 65% of screen height for image
-    position: 'absolute',
-    top: 0,
-    left: 0,
-  },
-  image: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  slideContent: {
-    marginTop: height * 0.45, // Push content down
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.xl,
-  },
-  iconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.white,
+  iconContainer: {
+    width: 84,
+    height: 84,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.lg,
-    ...Shadows.md,
+    marginBottom: 24,
   },
   title: {
-    fontSize: Typography.fontSize['3xl'],
-    fontWeight: Typography.fontWeight.heavy,
-    color: Colors.white,
-    lineHeight: 42,
-    marginBottom: Spacing.sm,
+    color: '#FFFFFF',
+    fontSize: Typography.fontSize.xl,
+    fontWeight: '800',
+    textAlign: 'center',
+    letterSpacing: -0.5,
+    marginBottom: 8,
   },
-  subtitle: {
-    fontSize: Typography.fontSize.base,
-    color: 'rgba(255,255,255,0.85)',
-    lineHeight: 24,
+  desc: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 12.5,
+    textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: 210,
+  },
+  chipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 16,
+  },
+  chip: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  chipText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 9.5,
+    fontWeight: '700',
   },
   paginationContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
-    position: 'absolute',
-    bottom: 200,
-    width: '100%',
-    gap: 8,
+    gap: 6,
+    marginTop: 24,
+    marginBottom: 20,
+    zIndex: 10,
   },
   dot: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.primary[400],
+    height: 6,
+    borderRadius: 3,
   },
-  bottomContainer: {
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.xl,
-    paddingBottom: Spacing['2xl'],
-    backgroundColor: Colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    marginTop: -24, // Overlap the carousel
-    gap: Spacing.md,
+  activeDot: {
+    width: 20,
+    backgroundColor: Colors.primary[500],
   },
-  primaryButton: {
-    height: 56,
-    backgroundColor: Colors.primary[600],
-    borderRadius: BorderRadius.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadows.md,
+  inactiveDot: {
+    width: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
   },
-  primaryButtonText: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.white,
+  actionContainer: {
+    paddingHorizontal: 24,
+    paddingBottom: 48,
+    zIndex: 10,
   },
-  secondaryButton: {
-    height: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.gray[100],
+  loginContainer: {
+    marginTop: 16,
+    paddingVertical: 8,
   },
-  secondaryButtonText: {
-    fontSize: Typography.fontSize.md,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.text.primary,
+  loginText: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    textAlign: 'center',
+    fontSize: 11.5,
   },
-  buttonPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
+  loginTextBold: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
 });
+

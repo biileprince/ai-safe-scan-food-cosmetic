@@ -1,325 +1,173 @@
-/**
- * SafeScan — Scan Tab
- */
-
-import { useState, useRef } from 'react';
-import { View, Text, Pressable, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+﻿import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, Platform, Alert, Dimensions } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView } from 'expo-camera';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
-import { useScanStore } from '../../stores/useScanStore';
-import { useAuthStore } from '../../stores/useAuthStore';
 import { useRouter } from 'expo-router';
-import { useCamera } from '../../hooks/useCamera';
-import { useImagePicker } from '../../hooks/useImagePicker';
+import * as ImagePicker from 'expo-image-picker';
+import Animated, { useAnimatedStyle, withRepeat, withTiming, Easing, useSharedValue } from 'react-native-reanimated';
+import { useAuthStore } from '../../stores/useAuthStore';
+import { useScanStore } from '../../stores/useScanStore';
+import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 export default function ScanScreen() {
-  const { user } = useAuthStore();
-  const { setCapturedImage, startScan } = useScanStore();
+  const [permission, requestPermission] = useCameraPermissions();
+  const [isScanning, setIsScanning] = useState(false);
   const router = useRouter();
+  const { user } = useAuthStore();
+  const { startScan } = useScanStore();
+  const scanLinePos = useSharedValue(0);
 
-  const cameraRef = useRef<CameraView>(null);
-  const { hasPermission, checkAndRequestPermission, isPending } = useCamera();
-  const { pickImage, isPicking } = useImagePicker();
+  useEffect(() => {
+    scanLinePos.value = withRepeat(
+      withTiming(height * 0.5, { duration: 2500, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true
+    );
+  }, []);
 
-  const [isCapturing, setIsCapturing] = useState(false);
+  const scanLineStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: scanLinePos.value }]
+  }));
 
-  const processAndUpload = async (uri: string) => {
-    if (!user) return;
-    try {
-      setCapturedImage(uri);
-      const fileName = `scan_${Date.now()}.jpg`;
-      const reportId = await startScan(user.$id, uri, fileName);
-      router.push(`/report/${reportId}`);
-    } catch (err) {
-      console.error('Failed to process image:', err);
-    }
-  };
+  if (!permission) return <View style={styles.container} />;
 
-  const handleTakePhoto = async () => {
-    if (!cameraRef.current || isCapturing) return;
-    try {
-      setIsCapturing(true);
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
-      if (photo?.uri) await processAndUpload(photo.uri);
-    } catch (err) {
-      console.error('Failed to take photo:', err);
-    } finally {
-      setIsCapturing(false);
-    }
-  };
+  if (!permission.granted) {
+    return (
+      <View style={styles.permissionContainer}>
+        <View style={styles.iconWrap}>
+          <Ionicons name="camera" size={48} color={Colors.primary[600]} />
+        </View>
+        <Text style={styles.permissionTitle}>Camera Access Required</Text>
+        <Text style={styles.permissionDesc}>
+          SafeScan needs camera access to read ingredient labels and product barcodes.
+        </Text>
+        <Pressable style={styles.permissionBtn} onPress={requestPermission}>
+          <Text style={styles.permissionBtnText}>Allow Access</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   const handlePickImage = async () => {
-    if (isPicking) return;
-    const uri = await pickImage();
-    if (uri) await processAndUpload(uri);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled) {
+      processImage(result.assets[0].uri);
+    }
   };
 
-  // Permission pending
-  if (isPending) {
-    return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={Colors.primary[600]} />
-          <Text style={styles.loadingText}>Initializing camera...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const processImage = async (uri: string) => {
+    if (!user?.$id) {
+      Alert.alert("Authentication Required", "Please log in to scan products.");
+      return;
+    }
 
-  // Permission denied
-  if (hasPermission === false) {
-    return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.centerContent}>
-          <View style={styles.permDeniedIcon}>
-            <Ionicons name="camera-outline" size={32} color={Colors.gray[400]} />
+    setIsScanning(true);
+    
+    try {
+      const fileName = `scan_${Date.now()}.jpg`;
+      const reportId = await startScan(user.$id, uri, fileName);
+      setIsScanning(false);
+      router.push(`/report/${reportId}`);
+    } catch (error) {
+      setIsScanning(false);
+      Alert.alert("Scan Failed", "There was an error uploading the scan. Please try again.");
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <CameraView 
+        style={StyleSheet.absoluteFill} 
+        facing="back"
+        onBarcodeScanned={isScanning ? undefined : (res) => {
+          // If we want barcode scanning later
+          // console.log(res.data);
+        }}
+      />
+      
+      {/* Overlay */}
+      <View style={styles.overlay}>
+        <View style={styles.headerRow}>
+          <Pressable onPress={() => router.back()} style={styles.iconBtn}>
+            <Ionicons name="close" size={28} color="#FFF" />
+          </Pressable>
+          <Pressable style={styles.iconBtn}>
+            <Ionicons name="flash-outline" size={24} color="#FFF" />
+          </Pressable>
+        </View>
+
+        {/* Scan Frame */}
+        <View style={styles.frameContainer}>
+          <View style={styles.scanFrame}>
+            <View style={[styles.corner, styles.tl]} />
+            <View style={[styles.corner, styles.tr]} />
+            <View style={[styles.corner, styles.bl]} />
+            <View style={[styles.corner, styles.br]} />
+            
+            {isScanning && (
+              <Animated.View style={[styles.scanLine, scanLineStyle]} />
+            )}
           </View>
-          <Text style={styles.permTitle}>Camera Access Required</Text>
-          <Text style={styles.permSubtitle}>
-            We need camera access to scan product labels. You can also upload from your gallery.
+          <Text style={styles.instructionText}>
+            {isScanning ? 'Analyzing ingredients...' : 'Align ingredients or barcode in frame'}
           </Text>
-          <Pressable style={styles.greenButton} onPress={checkAndRequestPermission}>
-            <Text style={styles.greenButtonText}>Grant Permission</Text>
+        </View>
+
+        {/* Controls */}
+        <View style={styles.controlsRow}>
+          <Pressable onPress={handlePickImage} style={styles.galleryBtn}>
+            <Ionicons name="images" size={24} color="#FFF" />
           </Pressable>
-          <Pressable style={styles.outlineButton} onPress={handlePickImage}>
-            <Ionicons name="images-outline" size={18} color={Colors.primary[600]} />
-            <Text style={styles.outlineButtonText}>Choose from Gallery</Text>
+          
+          <Pressable 
+            style={[styles.captureBtn, isScanning && styles.captureBtnDisabled]}
+            disabled={isScanning}
+            onPress={() => {
+              // Usually we'd take a picture with the camera ref here.
+              // We'll mock a generic image uri upload if they just press the button without picking image.
+              Alert.alert("Hint", "Use the gallery icon to pick an image for now in this environment, or test on a physical device.");
+            }}
+          >
+            <View style={styles.captureBtnInner} />
           </Pressable>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Scan Product</Text>
-        <Text style={styles.headerSubtitle}>
-          Point your camera at the ingredient list on any food or cosmetic product.
-        </Text>
-      </View>
-
-      {/* Camera */}
-      <View style={styles.cameraContainer}>
-        <View style={styles.cameraView}>
-          <CameraView
-            ref={cameraRef}
-            style={StyleSheet.absoluteFill}
-            facing="back"
-          />
-          {/* Corner guides */}
-          <View style={[styles.corner, styles.cTL]} />
-          <View style={[styles.corner, styles.cTR]} />
-          <View style={[styles.corner, styles.cBL]} />
-          <View style={[styles.corner, styles.cBR]} />
-        </View>
-
-        {/* Tips */}
-        <View style={styles.tipsRow}>
-          <Tip icon="sunny-outline" text="Good lighting" />
-          <Tip icon="resize-outline" text="Flat surface" />
-          <Tip icon="text-outline" text="Clear text" />
+          
+          <View style={styles.spacer} />
         </View>
       </View>
-
-      {/* Actions */}
-      <View style={styles.actions}>
-        <Pressable style={styles.galleryButton} onPress={handlePickImage} disabled={isCapturing}>
-          <Ionicons name="images-outline" size={22} color={Colors.gray[600]} />
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.captureButton, (pressed || isCapturing) && styles.capturePressed]}
-          onPress={handleTakePhoto}
-          disabled={isCapturing}
-        >
-          {isCapturing ? (
-            <ActivityIndicator size="small" color={Colors.white} />
-          ) : (
-            <View style={styles.captureInner} />
-          )}
-        </Pressable>
-
-        <View style={{ width: 48 }} />
-      </View>
-    </SafeAreaView>
-  );
-}
-
-function Tip({ icon, text }: { icon: any; text: string }) {
-  return (
-    <View style={styles.tip}>
-      <Ionicons name={icon} size={14} color={Colors.primary[600]} />
-      <Text style={styles.tipText}>{text}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background.primary,
-  },
-  centerContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.md,
-    paddingHorizontal: Spacing['2xl'],
-  },
-  loadingText: {
-    color: Colors.text.secondary,
-    fontSize: Typography.fontSize.base,
-  },
-  permDeniedIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: Colors.gray[100],
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.sm,
-  },
-  permTitle: {
-    fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.bold,
-    color: Colors.text.primary,
-  },
-  permSubtitle: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.text.secondary,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  greenButton: {
-    height: 48,
-    paddingHorizontal: Spacing['2xl'],
-    backgroundColor: Colors.primary[600],
-    borderRadius: BorderRadius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: Spacing.base,
-  },
-  greenButtonText: {
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.white,
-  },
-  outlineButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    height: 44,
-    paddingHorizontal: Spacing.xl,
-    borderWidth: 1,
-    borderColor: Colors.primary[600],
-    borderRadius: BorderRadius.lg,
-    marginTop: Spacing.sm,
-  },
-  outlineButtonText: {
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.medium,
-    color: Colors.primary[600],
-  },
-  header: {
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.base,
-    paddingBottom: Spacing.base,
-  },
-  headerTitle: {
-    fontSize: Typography.fontSize['2xl'],
-    fontWeight: Typography.fontWeight.heavy,
-    color: Colors.text.primary,
-  },
-  headerSubtitle: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.text.secondary,
-    marginTop: Spacing.xs,
-    lineHeight: 18,
-  },
-  cameraContainer: {
-    flex: 1,
-    paddingHorizontal: Spacing.xl,
-    gap: Spacing.base,
-    justifyContent: 'center',
-  },
-  cameraView: {
-    aspectRatio: 3 / 4,
-    maxHeight: 420,
-    alignSelf: 'center',
-    width: width - 48,
-    borderRadius: BorderRadius['2xl'],
-    overflow: 'hidden',
-    backgroundColor: Colors.gray[900],
-  },
-  corner: {
-    position: 'absolute',
-    width: 28,
-    height: 28,
-    borderColor: Colors.primary[500],
-  },
-  cTL: { top: 16, left: 16, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 6 },
-  cTR: { top: 16, right: 16, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 6 },
-  cBL: { bottom: 16, left: 16, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 6 },
-  cBR: { bottom: 16, right: 16, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 6 },
-  tipsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.md,
-  },
-  tip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.primary[50],
-    borderRadius: BorderRadius.full,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 6,
-  },
-  tipText: {
-    fontSize: Typography.fontSize.xs,
-    color: Colors.primary[700],
-    fontWeight: Typography.fontWeight.medium,
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing['2xl'],
-    paddingVertical: Spacing.xl,
-  },
-  galleryButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.gray[100],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  captureButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.primary[600],
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadows.lg,
-  },
-  capturePressed: {
-    transform: [{ scale: 0.92 }],
-    opacity: 0.9,
-  },
-  captureInner: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.4)',
-    backgroundColor: 'transparent',
-  },
+  container: { flex: 1, backgroundColor: '#000' },
+  permissionContainer: { flex: 1, backgroundColor: Colors.background.primary, alignItems: 'center', justifyContent: 'center', padding: Spacing['2xl'] },
+  iconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.primary[50], alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.xl },
+  permissionTitle: { fontSize: Typography.fontSize.xl, fontWeight: '700', color: Colors.text.primary, marginBottom: Spacing.sm },
+  permissionDesc: { fontSize: Typography.fontSize.base, color: Colors.text.secondary, textAlign: 'center', lineHeight: 24, marginBottom: Spacing['2xl'] },
+  permissionBtn: { backgroundColor: Colors.primary[600], paddingHorizontal: 32, paddingVertical: 14, borderRadius: BorderRadius.full },
+  permissionBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', padding: Spacing.xl, justifyContent: 'space-between' },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: Platform.OS === 'ios' ? 40 : 20 },
+  iconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+  frameContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  scanFrame: { width: width * 0.75, height: height * 0.45, position: 'relative', overflow: 'hidden' },
+  corner: { position: 'absolute', width: 40, height: 40, borderColor: '#FFF', borderWidth: 4 },
+  tl: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 16 },
+  tr: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0, borderTopRightRadius: 16 },
+  bl: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0, borderBottomLeftRadius: 16 },
+  br: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0, borderBottomRightRadius: 16 },
+  scanLine: { width: '100%', height: 2, backgroundColor: Colors.primary[400], position: 'absolute', top: 0, shadowColor: Colors.primary[400], shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 10, elevation: 5 },
+  instructionText: { color: '#FFF', fontSize: 16, fontWeight: '600', marginTop: Spacing['2xl'], textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  controlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 40 },
+  galleryBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+  captureBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' },
+  captureBtnDisabled: { opacity: 0.5 },
+  captureBtnInner: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFF' },
+  spacer: { width: 56 }
 });

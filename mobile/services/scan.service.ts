@@ -4,6 +4,7 @@
 
 import { ID } from 'react-native-appwrite';
 import { databases, functions } from './appwrite';
+import { Permission, Role } from 'react-native-appwrite';
 import { uploadImage } from './storage.service';
 
 const DB_ID = 'safescan_db';
@@ -80,7 +81,12 @@ export async function startScanSession(userId: string, imageUri: string, fileNam
         imageFileId: fileId,
         status: 'processing',
         createdAt: new Date().toISOString(),
-      }
+      },
+      [
+        Permission.read(Role.user(userId)),
+        Permission.write(Role.user(userId)),
+        Permission.update(Role.user(userId))
+      ]
     );
 
     // 3. Trigger analysis function asynchronously

@@ -53,3 +53,5 @@ export const functions = new Functions(client);
 // ─── Re-exports ─────────────────────────────────────────────────
 export { client, ID, Query };
 export default client;
+
+export const functions = new Functions(client);

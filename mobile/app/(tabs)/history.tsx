@@ -1,232 +1,143 @@
-/**
- * SafeScan — History Tab
- */
-
-import { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet, RefreshControl } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+﻿import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, Pressable, SafeAreaView, ActivityIndicator, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
+import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../stores/useAuthStore';
-import * as scanService from '../../services/scan.service';
-import type { ScanReport } from '../../services/scan.service';
-import { ASSESSMENTS, getAssessmentColor, getAssessmentBgColor } from '../../constants/assessments';
-import type { AssessmentTier } from '../../constants/assessments';
-import { formatDate, formatCategory } from '../../utils/formatters';
-
-type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
-
-const ASSESSMENT_ICONS: Record<string, IoniconsName> = {
-  favorable: 'checkmark-circle',
-  caution: 'alert-circle',
-  concern: 'close-circle',
-  insufficient: 'help-circle',
-};
+import { useScanStore } from '../../stores/useScanStore';
+import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 
 export default function HistoryScreen() {
-  const { user } = useAuthStore();
   const router = useRouter();
-  const [reports, setReports] = useState<ScanReport[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuthStore();
+  const { history, isHistoryLoading, fetchHistory } = useScanStore();
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadReports = useCallback(async () => {
-    if (!user) return;
-    try {
-      const data = await scanService.getUserReports(user.$id);
-      setReports(data);
-    } catch (err) {
-      console.error('Failed to load reports:', err);
-    } finally {
-      setIsLoading(false);
+  useEffect(() => {
+    if (user?.$id && history.length === 0) {
+      fetchHistory(user.$id);
+    }
+  }, [user?.$id]);
+
+  const onRefresh = async () => {
+    if (user?.$id) {
+      setRefreshing(true);
+      await fetchHistory(user.$id);
       setRefreshing(false);
     }
-  }, [user]);
+  };
 
-  useEffect(() => { loadReports(); }, [loadReports]);
+  const getScoreColor = (score?: number) => {
+    if (score === undefined) return Colors.gray[400];
+    if (score >= 80) return Colors.status.favorable;
+    if (score >= 40) return Colors.status.caution;
+    return Colors.status.concern;
+  };
+  
+  const getScoreBg = (score?: number) => {
+    if (score === undefined) return Colors.gray[100];
+    if (score >= 80) return Colors.status.favorableBg;
+    if (score >= 40) return Colors.status.cautionBg;
+    return Colors.status.concernBg;
+  };
 
-  const onRefresh = () => { setRefreshing(true); loadReports(); };
-
-  const renderReport = ({ item }: { item: ScanReport }) => {
-    const assessment = item.overallAssessment as AssessmentTier;
-    const def = assessment ? ASSESSMENTS[assessment] : null;
-    const color = assessment ? getAssessmentColor(assessment) : Colors.gray[400];
-    const bgColor = assessment ? getAssessmentBgColor(assessment) : Colors.gray[50];
-    const icon = def ? ASSESSMENT_ICONS[def.colorKey] : 'sync-outline';
-
+  const renderItem = ({ item }: { item: any }) => {
+    const numericScore = item.overallAssessment === 'Safe' ? 95 : (item.overallAssessment ? 45 : undefined);
+    
     return (
-      <Pressable
-        style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      <Pressable 
+        style={styles.card}
         onPress={() => router.push(`/report/${item.$id}`)}
       >
-        <View style={styles.cardHeader}>
-          <View style={styles.cardInfo}>
-            <Text style={styles.productName} numberOfLines={1}>
-              {item.productName || 'Unnamed Product'}
-            </Text>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaText}>{formatDate(item.createdAt)}</Text>
-              <View style={styles.metaDot} />
-              <Text style={styles.metaText}>{formatCategory(item.productCategory || 'unknown')}</Text>
-            </View>
-          </View>
-          <View style={[styles.badge, { backgroundColor: bgColor }]}>
-            <Ionicons name={icon as IoniconsName} size={14} color={color} />
-            <Text style={[styles.badgeText, { color }]}>
-              {def?.shortLabel || 'Processing'}
-            </Text>
-          </View>
+        <View style={styles.imageWrap}>
+          <Ionicons name="image-outline" size={24} color={Colors.gray[400]} />
         </View>
-
-        <Ionicons name="chevron-forward" size={16} color={Colors.gray[300]} style={styles.chevron} />
+        <View style={styles.content}>
+          <Text style={styles.title} numberOfLines={1}>{item.productName || 'Unknown Product'}</Text>
+          <Text style={styles.date}>
+            {new Date(item.createdAt).toLocaleDateString(undefined, { 
+              month: 'short', day: 'numeric', year: 'numeric' 
+            })}
+          </Text>
+        </View>
+        <View style={[
+          styles.scoreBadge, 
+          { backgroundColor: getScoreBg(numericScore) }
+        ]}>
+          <Text style={[
+            styles.scoreText,
+            { color: getScoreColor(numericScore) }
+          ]}>
+            {item.status === 'processing' ? '...' : (numericScore || '-')}
+          </Text>
+        </View>
       </Pressable>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Scan History</Text>
-        <Text style={styles.subtitle}>
-          {reports.length} {reports.length === 1 ? 'scan' : 'scans'} completed
-        </Text>
-      </View>
-
-      {reports.length === 0 && !isLoading ? (
-        <View style={styles.emptyState}>
-          <View style={styles.emptyIcon}>
-            <Ionicons name="document-text-outline" size={36} color={Colors.gray[300]} />
-          </View>
-          <Text style={styles.emptyTitle}>No Scans Yet</Text>
-          <Text style={styles.emptySubtitle}>
-            Scan your first product to see results here.
-          </Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Scan History</Text>
         </View>
-      ) : (
-        <FlatList
-          data={reports}
-          renderItem={renderReport}
-          keyExtractor={(item) => item.$id}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={Colors.primary[600]}
-            />
-          }
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+
+        {isHistoryLoading && !refreshing ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={Colors.primary[600]} />
+          </View>
+        ) : history.length === 0 ? (
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIconWrap}>
+              <Ionicons name="time-outline" size={48} color={Colors.gray[400]} />
+            </View>
+            <Text style={styles.emptyTitle}>No history yet</Text>
+            <Text style={styles.emptyDesc}>
+              Products you scan will appear here so you can refer back to them later.
+            </Text>
+            <Pressable 
+              style={styles.scanBtn}
+              onPress={() => router.push('/(tabs)/scan')}
+            >
+              <Text style={styles.scanBtnText}>Scan a product</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <FlatList
+            data={history}
+            keyExtractor={(item) => item.$id}
+            renderItem={renderItem}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary[600]} />
+            }
+          />
+        )}
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background.secondary,
-  },
-  header: {
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.base,
-    paddingBottom: Spacing.base,
-    backgroundColor: Colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border.default,
-  },
-  title: {
-    fontSize: Typography.fontSize['2xl'],
-    fontWeight: Typography.fontWeight.heavy,
-    color: Colors.text.primary,
-  },
-  subtitle: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.text.tertiary,
-    marginTop: 2,
-  },
-  listContent: {
-    padding: Spacing.base,
-    gap: Spacing.md,
-  },
-  card: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.base,
-    flexDirection: 'row',
-    alignItems: 'center',
-    ...Shadows.card,
-  },
-  cardPressed: {
-    backgroundColor: Colors.gray[50],
-  },
-  cardHeader: {
-    flex: 1,
-    gap: Spacing.sm,
-  },
-  cardInfo: {
-    gap: 2,
-  },
-  productName: {
-    fontSize: Typography.fontSize.md,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.text.primary,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  metaText: {
-    fontSize: Typography.fontSize.xs,
-    color: Colors.text.tertiary,
-  },
-  metaDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: Colors.gray[300],
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.full,
-    alignSelf: 'flex-start',
-  },
-  badgeText: {
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  chevron: {
-    marginLeft: Spacing.sm,
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing['3xl'],
-    gap: Spacing.md,
-  },
-  emptyIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.gray[100],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyTitle: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.text.primary,
-  },
-  emptySubtitle: {
-    fontSize: Typography.fontSize.base,
-    color: Colors.text.secondary,
-    textAlign: 'center',
-  },
+  safeArea: { flex: 1, backgroundColor: Colors.background.primary },
+  container: { flex: 1 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.base, paddingTop: Spacing.xl, paddingBottom: Spacing.md },
+  headerTitle: { fontSize: Typography.fontSize.xl, fontWeight: '800', color: Colors.text.primary },
+  clearBtn: { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: Colors.gray[100], borderRadius: BorderRadius.full },
+  clearBtnText: { fontSize: 12, fontWeight: '600', color: Colors.text.secondary },
+  listContent: { paddingHorizontal: Spacing.base, paddingBottom: Spacing['4xl'] },
+  card: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.border.default, borderRadius: BorderRadius.lg, padding: Spacing.sm, marginBottom: Spacing.sm, ...Shadows.sm },
+  imageWrap: { width: 48, height: 48, borderRadius: BorderRadius.md, backgroundColor: Colors.gray[100], alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  content: { flex: 1, marginLeft: Spacing.md },
+  title: { fontSize: 15, fontWeight: '700', color: Colors.text.primary, marginBottom: 2 },
+  date: { fontSize: 12, color: Colors.text.tertiary },
+  scoreBadge: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginLeft: Spacing.sm },
+  scoreText: { fontSize: 13, fontWeight: '800' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing['2xl'] },
+  emptyIconWrap: { width: 96, height: 96, borderRadius: 48, backgroundColor: Colors.gray[50], alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.xl },
+  emptyTitle: { fontSize: Typography.fontSize.lg, fontWeight: '700', color: Colors.text.primary, marginBottom: Spacing.sm },
+  emptyDesc: { fontSize: Typography.fontSize.sm, color: Colors.text.secondary, textAlign: 'center', lineHeight: 20, marginBottom: Spacing.xl },
+  scanBtn: { backgroundColor: Colors.primary[600], paddingHorizontal: Spacing['2xl'], paddingVertical: 14, borderRadius: BorderRadius.full, ...Shadows.md },
+  scanBtnText: { color: '#FFF', fontSize: Typography.fontSize.base, fontWeight: '700' }
 });

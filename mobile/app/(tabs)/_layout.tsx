@@ -1,70 +1,123 @@
-/**
- * SafeScan — Tab Layout
- */
-
-import { Tabs } from 'expo-router';
+﻿import React from 'react';
+import { View, StyleSheet, Platform, Pressable } from 'react-native';
+import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Typography } from '../../constants/theme';
-
-type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+import { Colors, Shadows } from '../../constants/theme';
 
 export default function TabLayout() {
+  const router = useRouter();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarStyle: styles.tabBar,
         tabBarActiveTintColor: Colors.primary[600],
         tabBarInactiveTintColor: Colors.gray[400],
-        tabBarStyle: {
-          backgroundColor: Colors.white,
-          borderTopColor: Colors.border.default,
-          borderTopWidth: 1,
-          height: 85,
-          paddingTop: 8,
-          paddingBottom: 28,
-        },
-        tabBarLabelStyle: {
-          fontSize: Typography.fontSize.xs,
-          fontWeight: Typography.fontWeight.medium,
-        },
+        tabBarShowLabel: true,
+        tabBarLabelStyle: styles.tabBarLabel,
       }}
     >
       <Tabs.Screen
-        name="scan"
+        name="index"
         options={{
-          title: 'Scan',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="scan-outline" size={size} color={color} />
+          title: 'Home',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
           ),
         }}
       />
+      
       <Tabs.Screen
         name="history"
         options={{
           title: 'History',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="time-outline" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'time' : 'time-outline'} size={22} color={color} />
           ),
         }}
       />
+
       <Tabs.Screen
-        name="compare"
+        name="scan"
         options={{
-          title: 'Compare',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="git-compare-outline" size={size} color={color} />
+          title: 'Scan',
+          tabBarButton: (props) => (
+            <Pressable
+              onPress={() => router.push('/(tabs)/scan')}
+              style={styles.scanButtonWrap}
+            >
+              <View style={styles.scanButtonInner}>
+                <Ionicons name="scan" size={24} color="#FFF" />
+              </View>
+            </Pressable>
           ),
         }}
       />
+
+      <Tabs.Screen
+        name="feed"
+        options={{
+          title: 'Feed',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'newspaper' : 'newspaper-outline'} size={22} color={color} />
+          ),
+        }}
+      />
+
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
           ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="compare"
+        options={{
+          href: null, // Hidden from tab bar
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.subtle,
+    height: Platform.OS === 'ios' ? 85 : 65,
+    paddingBottom: Platform.OS === 'ios' ? 25 : 8,
+    paddingTop: 8,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+  },
+  tabBarLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  scanButtonWrap: {
+    top: -20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Shadows.lg,
+  },
+  scanButtonInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.primary[600],
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
+  },
+});
