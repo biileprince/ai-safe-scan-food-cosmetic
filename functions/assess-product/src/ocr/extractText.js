@@ -1,12 +1,5 @@
 import { getProvider } from '../providers/providerFactory.js';
 
-/**
- * Extracts raw text from a product image using Vision AI.
- * 
- * @param {Buffer} imageBuffer - The image file buffer
- * @param {string} mimeType - e.g., 'image/jpeg'
- * @returns {Promise<{text: string, confidence: number}>}
- */
 export async function extractTextFromImage(imageBuffer, mimeType) {
   const provider = getProvider();
   
@@ -18,11 +11,9 @@ export async function extractTextFromImage(imageBuffer, mimeType) {
   `;
 
   try {
-    const rawText = await provider.analyzeImage(imageBuffer, mimeType, prompt);
+    const result = await provider.analyzeImage(imageBuffer, prompt);
     
-    // In a real implementation, we could calculate confidence based on
-    // known label structures or ask the LLM to score its own confidence.
-    // For now, we assume a high baseline if it returns text.
+    const rawText = typeof result === 'string' ? result : (result.text || '');
     const confidence = rawText && rawText.length > 20 ? 0.95 : 0.4;
 
     return {
@@ -30,7 +21,7 @@ export async function extractTextFromImage(imageBuffer, mimeType) {
       confidence
     };
   } catch (error) {
-    console.error('Error in extractTextFromImage:', error);
-    throw new Error('Failed to extract text from image');
+    // Re-throw with the actual error message so logs show what went wrong
+    throw new Error('OCR failed: ' + (error.message || error));
   }
 }
