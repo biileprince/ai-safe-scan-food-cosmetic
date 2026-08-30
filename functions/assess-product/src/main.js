@@ -26,7 +26,7 @@ export default async ({ req, res, log, error }) => {
 
   const projectId = process.env.APPWRITE_FUNCTION_PROJECT_ID || process.env.APPWRITE_PROJECT_ID;
   const apiKey = process.env.APPWRITE_FUNCTION_API_KEY || process.env.APPWRITE_API_KEY;
-  const endpoint = 'https://cloud.appwrite.io/v1';
+  const endpoint = process.env.APPWRITE_FUNCTION_API_ENDPOINT || 'https://cloud.appwrite.io/v1';
 
   // RAW FETCH TEST: Check if we can even reach the Appwrite API
   log('RAW FETCH TEST: Trying to reach ' + endpoint + '/health...');
