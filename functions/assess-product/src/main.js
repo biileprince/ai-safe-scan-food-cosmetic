@@ -1,4 +1,4 @@
-import { getAppwriteClient } from './utils/appwriteClient.js';
+import { Client, Databases, Storage, Query } from 'node-appwrite';
 import { extractTextFromImage } from './ocr/extractText.js';
 import { classifyProduct } from './classification/classifyProduct.js';
 import { extractIngredients } from './extraction/extractIngredients.js';
@@ -12,9 +12,38 @@ import { generateExplanation } from './assessment/explanationGenerator.js';
 export default async ({ req, res, log, error }) => {
   log('Function started.');
   
+  // Debug: Log available environment variables (keys only, not values)
+  log('ENV check: APPWRITE_FUNCTION_PROJECT_ID = ' + (process.env.APPWRITE_FUNCTION_PROJECT_ID ? 'SET' : 'MISSING'));
+  log('ENV check: APPWRITE_FUNCTION_API_KEY = ' + (process.env.APPWRITE_FUNCTION_API_KEY ? 'SET' : 'MISSING'));
+  log('ENV check: APPWRITE_API_KEY = ' + (process.env.APPWRITE_API_KEY ? 'SET' : 'MISSING'));
+  log('ENV check: GEMINI_API_KEY = ' + (process.env.GEMINI_API_KEY ? 'SET' : 'MISSING'));
+  log('ENV check: AI_API_KEY = ' + (process.env.AI_API_KEY ? 'SET' : 'MISSING'));
+  
   if (req.method !== 'POST') {
     return res.json({ success: false, error: 'Method not allowed' }, 405);
   }
+
+  // Build Appwrite client directly here so we can log issues
+  const projectId = process.env.APPWRITE_FUNCTION_PROJECT_ID || process.env.APPWRITE_PROJECT_ID;
+  const apiKey = process.env.APPWRITE_FUNCTION_API_KEY || process.env.APPWRITE_API_KEY;
+  const endpoint = 'https://cloud.appwrite.io/v1';
+
+  log(`Using endpoint: ${endpoint}`);
+  log(`Using projectId: ${projectId}`);
+  log(`API key present: ${!!apiKey}`);
+
+  if (!projectId || !apiKey) {
+    error('Missing projectId or apiKey!');
+    return res.json({ success: false, error: 'Server misconfiguration: missing projectId or apiKey' }, 500);
+  }
+
+  const client = new Client()
+    .setEndpoint(endpoint)
+    .setProject(projectId)
+    .setKey(apiKey);
+    
+  const databases = new Databases(client);
+  const storage = new Storage(client);
 
   try {
     const payload = JSON.parse(req.body);
@@ -24,74 +53,83 @@ export default async ({ req, res, log, error }) => {
       return res.json({ success: false, error: 'Missing required parameters' }, 400);
     }
     
-    log(`Processing reportId: ${reportId}, fileId: ${fileId}`);
+    log(`Processing reportId: ${reportId}, userId: ${userId}, fileId: ${fileId}`);
     
-    const { client, databases, storage } = getAppwriteClient();
     const DB_ID = 'safescan_db';
     const REPORTS_COLLECTION = 'scan_reports';
-    const BUCKET_ID = 'scan_images'; // Must match mobile side
+    const BUCKET_ID = 'scan_images';
 
-    // 1. Fetch user profile for personalization
-    let userProfile = {};
+    // Step 1: Test database connectivity first
+    log('Step 1: Testing database connectivity...');
     try {
-      const profileDocs = await databases.listDocuments(DB_ID, 'users_profiles', [
-        require('node-appwrite').Query.equal('userId', userId)
-      ]);
-      if (profileDocs.documents.length > 0) {
-        userProfile = profileDocs.documents[0];
-      }
-    } catch (err) {
-      log('Could not fetch user profile, proceeding with default rules.');
+      await databases.getDocument(DB_ID, REPORTS_COLLECTION, reportId);
+      log('Step 1: Database connection OK!');
+    } catch (dbErr) {
+      error('Step 1 FAILED - Cannot reach database: ' + dbErr.message);
+      return res.json({ success: false, error: 'Database connection failed: ' + dbErr.message }, 500);
     }
 
-    // 2. Download image buffer
-    const fileBuffer = await storage.getFileDownload(BUCKET_ID, fileId);
-    
-    // 3. OCR Extraction
-    log('Extracting text from image...');
+    // Step 2: Download image
+    log('Step 2: Downloading image from storage...');
+    let fileBuffer;
+    try {
+      fileBuffer = await storage.getFileDownload(BUCKET_ID, fileId);
+      log('Step 2: Image downloaded OK! Size: ' + (fileBuffer ? fileBuffer.length || 'unknown' : 'null'));
+    } catch (storageErr) {
+      error('Step 2 FAILED - Cannot download image: ' + storageErr.message);
+      await databases.updateDocument(DB_ID, REPORTS_COLLECTION, reportId, {
+        status: 'failed',
+        explanationText: 'Failed to download image: ' + storageErr.message
+      });
+      return res.json({ success: false, error: 'Storage download failed: ' + storageErr.message }, 500);
+    }
+
+    // Step 3: OCR
+    log('Step 3: Extracting text from image (OCR)...');
     const { text: rawOcrText, confidence: ocrConfidence } = await extractTextFromImage(fileBuffer, 'image/jpeg');
+    log('Step 3: OCR done. Text length: ' + (rawOcrText ? rawOcrText.length : 0));
     
-    // 4. Classification
-    log('Classifying product...');
+    // Step 4: Classification
+    log('Step 4: Classifying product...');
     const productCategory = await classifyProduct(rawOcrText);
+    log('Step 4: Category = ' + productCategory);
     
-    // 5. Ingredient Extraction
-    log('Extracting ingredients...');
+    // Step 5: Ingredient Extraction
+    log('Step 5: Extracting ingredients...');
     const { productName, ingredients: rawIngredients } = await extractIngredients(rawOcrText);
+    log('Step 5: Product = ' + productName + ', Ingredients count = ' + (rawIngredients ? rawIngredients.length : 0));
     
-    // 6. Normalization
-    log('Normalizing ingredients...');
+    // Step 6: Normalization
+    log('Step 6: Normalizing ingredients...');
     const normalizedIngredients = await normalizeIngredients(rawIngredients, productCategory);
     
-    // Calculate average match confidence
     const matchConfidence = normalizedIngredients.length > 0 
       ? normalizedIngredients.reduce((sum, ing) => sum + (ing.matchConfidence || 0), 0) / normalizedIngredients.length 
       : 0;
 
-    // 7. Safety Database Lookup
-    log('Looking up safety data...');
-    const enrichedIngredients = await lookupIngredients(normalizedIngredients, userProfile.jurisdiction || 'NG');
+    // Step 7: Safety Lookup
+    log('Step 7: Looking up safety data...');
+    const enrichedIngredients = await lookupIngredients(normalizedIngredients, 'NG');
     
-    // 8. Apply Rules based on category
-    log('Applying safety rules...');
+    // Step 8: Apply Rules
+    log('Step 8: Applying safety rules...');
     let analysis;
     if (productCategory === 'food' || productCategory === 'beverage') {
-      analysis = applyFoodRules(enrichedIngredients, userProfile);
+      analysis = applyFoodRules(enrichedIngredients, {});
     } else {
-      // Skincare, haircare, makeup, soap, body_lotion, unknown
-      analysis = applyCosmeticRules(enrichedIngredients, userProfile);
+      analysis = applyCosmeticRules(enrichedIngredients, {});
     }
     
-    // 9. Score Engine
-    log('Calculating overall assessment...');
+    // Step 9: Score
+    log('Step 9: Calculating overall assessment...');
     const overallAssessment = calculateOverallAssessment(analysis, ocrConfidence);
     
-    // 10. Generate Explanation
-    log('Generating explanation...');
+    // Step 10: Explanation
+    log('Step 10: Generating explanation...');
     const explanationText = await generateExplanation(productCategory, overallAssessment, analysis);
     
-    // 11. Update Report in DB
-    log('Updating report in database...');
+    // Step 11: Update Report
+    log('Step 11: Updating report in database...');
     await databases.updateDocument(DB_ID, REPORTS_COLLECTION, reportId, {
       status: 'completed',
       productName,
@@ -110,20 +148,20 @@ export default async ({ req, res, log, error }) => {
     return res.json({ success: true, reportId, assessment: overallAssessment });
 
   } catch (err) {
-    error('Function failed: ' + err.message);
+    error('Function failed at: ' + err.message);
+    error('Stack: ' + err.stack);
     
-    // Try to update report status to failed
     try {
       const payload = JSON.parse(req.body);
       if (payload.reportId) {
-        const { databases } = getAppwriteClient();
         await databases.updateDocument('safescan_db', 'scan_reports', payload.reportId, {
           status: 'failed',
-          explanationText: 'An error occurred during analysis: ' + err.message
+          explanationText: 'Analysis error: ' + err.message
         });
+        log('Updated report status to failed.');
       }
     } catch (updateErr) {
-      error('Could not update report status to failed.');
+      error('Could not update report status: ' + updateErr.message);
     }
 
     return res.json({ success: false, error: err.message }, 500);
