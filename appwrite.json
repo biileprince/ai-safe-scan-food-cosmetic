@@ -1,0 +1,18 @@
+﻿{
+  "projectId": "6a8b501c000c7f0210e6",
+  "projectName": "SafeScan",
+  "functions": [
+    {
+      "$id": "assess-product",
+      "name": "Assess Product",
+      "runtime": "node-20.0",
+      "execute": ["users"],
+      "events": [],
+      "schedule": "",
+      "timeout": 15,
+      "path": "functions/assess-product",
+      "entrypoint": "src/main.js",
+      "commands": "npm install"
+    }
+  ]
+}
