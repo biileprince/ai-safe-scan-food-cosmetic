@@ -1,5 +1,7 @@
-{
-  "dependencies": {
-    "node-appwrite": "^28.0.0"
+﻿{
+  "name": "safescan-root",
+  "private": true,
+  "scripts": {
+    "postinstall": "cd functions/assess-product && npm install"
   }
 }
