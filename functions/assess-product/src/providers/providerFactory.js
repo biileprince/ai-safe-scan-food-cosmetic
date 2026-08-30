@@ -24,14 +24,14 @@ import { GeminiProvider } from './geminiProvider.js';
  * @param {string} [overrides.model] - Override AI_MODEL env
  * @returns {import('./aiProvider.js').AIProvider}
  */
-export function getAIProvider(overrides = {}) {
+export function getProvider(overrides = {}) {
   const provider = overrides.provider || process.env.AI_PROVIDER || 'gemini';
-  const apiKey = overrides.apiKey || process.env.AI_API_KEY;
+  const apiKey = overrides.apiKey || process.env.AI_API_KEY || process.env.GEMINI_API_KEY;
   const model = overrides.model || process.env.AI_MODEL;
 
   if (!apiKey) {
     throw new Error(
-      `AI_API_KEY environment variable is required. ` +
+      `AI_API_KEY or GEMINI_API_KEY environment variable is required. ` +
       `Set it in your Appwrite Function environment variables.`
     );
   }
