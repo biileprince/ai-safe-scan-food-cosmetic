@@ -29,7 +29,7 @@ export default async ({ req, res, log, error }) => {
     const { client, databases, storage } = getAppwriteClient();
     const DB_ID = 'safescan_db';
     const REPORTS_COLLECTION = 'scan_reports';
-    const BUCKET_ID = 'images_bucket'; // Must match mobile side
+    const BUCKET_ID = 'scan_images'; // Must match mobile side
 
     // 1. Fetch user profile for personalization
     let userProfile = {};
