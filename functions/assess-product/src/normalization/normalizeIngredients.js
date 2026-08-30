@@ -31,7 +31,8 @@ export async function normalizeIngredients(ingredients, category) {
   `;
 
   try {
-    let result = await provider.generateText(prompt);
+    const response = await provider.generateText(prompt);
+    let result = response.text;
     
     if (result.includes('\`\`\`json')) {
       result = result.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
