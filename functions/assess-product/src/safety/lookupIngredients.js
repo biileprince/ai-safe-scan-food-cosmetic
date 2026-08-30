@@ -1,8 +1,5 @@
-import { getAppwriteClient } from '../utils/appwriteClient.js';
-import { Query } from 'node-appwrite';
-
 /**
- * Looks up normalized ingredients in the Appwrite 'ingredients' collection.
+ * Looks up normalized ingredients in the Appwrite 'ingredients' collection using raw fetch.
  * 
  * @param {Array<{canonical: string, raw: string, matchConfidence: number}>} ingredients
  * @param {string} jurisdiction - e.g., 'US', 'EU', 'NG'
@@ -11,7 +8,10 @@ import { Query } from 'node-appwrite';
 export async function lookupIngredients(ingredients, jurisdiction = 'NG') {
   if (!ingredients || ingredients.length === 0) return [];
   
-  const { databases } = getAppwriteClient();
+  const projectId = process.env.APPWRITE_FUNCTION_PROJECT_ID;
+  const apiKey = process.env.APPWRITE_FUNCTION_API_KEY || process.env.APPWRITE_API_KEY;
+  const endpoint = process.env.APPWRITE_FUNCTION_API_ENDPOINT || 'https://cloud.appwrite.io/v1';
+  
   const DB_ID = 'safescan_db';
   const COLLECTION_ID = 'ingredients';
   
@@ -19,16 +19,27 @@ export async function lookupIngredients(ingredients, jurisdiction = 'NG') {
 
   for (const ing of ingredients) {
     try {
-      // Query the database for the canonical name
-      // In a robust implementation, we would also check synonyms using full-text search
-      const result = await databases.listDocuments(DB_ID, COLLECTION_ID, [
-        Query.equal('canonicalName', ing.canonical),
-        Query.limit(1)
-      ]);
+      // Query the database for the canonical name using raw fetch
+      const queryParam = encodeURIComponent(`{"method":"equal","attribute":"canonicalName","values":["${ing.canonical}"]}`);
+      const limitParam = encodeURIComponent(`{"method":"limit","values":[1]}`);
+      
+      const url = `${endpoint}/databases/${DB_ID}/collections/${COLLECTION_ID}/documents?queries[0]=${queryParam}&queries[1]=${limitParam}`;
+      
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Appwrite-Project': projectId,
+          'X-Appwrite-Key': apiKey
+        }
+      });
       
       let dbData = null;
-      if (result.documents.length > 0) {
-        dbData = result.documents[0];
+      if (res.status === 200) {
+        const result = await res.json();
+        if (result.documents && result.documents.length > 0) {
+          dbData = result.documents[0];
+        }
       }
 
       enrichedIngredients.push({
