@@ -163,7 +163,6 @@ export default async ({ req, res, log, error }) => {
           status: 'completed',
           productName,
           productCategory,
-          rawOcrText,
           ocrConfidence,
           matchConfidence,
           overallAssessment,
