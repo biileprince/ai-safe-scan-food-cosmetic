@@ -192,7 +192,7 @@ export default async ({ req, res, log, error }) => {
     try {
       const payload = JSON.parse(req.body);
       if (payload.reportId) {
-        const updateUrl = endpoint + '/databases/' + DB_ID + '/collections/' + REPORTS_COLLECTION + '/documents/' + payload.reportId;
+        const updateUrl = endpoint + '/databases/safescan_db/collections/scan_reports/documents/' + payload.reportId;
         await fetch(updateUrl, {
           method: 'PATCH',
           headers: {
