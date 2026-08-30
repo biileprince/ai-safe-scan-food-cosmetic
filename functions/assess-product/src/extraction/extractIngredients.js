@@ -26,7 +26,8 @@ export async function extractIngredients(rawText) {
   `;
 
   try {
-    let result = await provider.generateText(prompt);
+    const response = await provider.generateText(prompt);
+    let result = response.text;
     
     // Clean up potential markdown formatting from LLM response
     if (result.includes('\`\`\`json')) {

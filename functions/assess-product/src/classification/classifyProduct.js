@@ -20,7 +20,7 @@ export async function classifyProduct(rawText) {
 
   try {
     const result = await provider.generateText(prompt);
-    const category = result.trim().toLowerCase();
+    const category = result.text.trim().toLowerCase();
     
     const validCategories = ['food', 'beverage', 'skincare', 'haircare', 'makeup', 'soap', 'body_lotion'];
     return validCategories.includes(category) ? category : 'unknown';

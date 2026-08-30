@@ -56,6 +56,7 @@ export class GeminiProvider extends AIProvider {
         temperature: options.temperature ?? 0.3,
         maxOutputTokens: options.maxTokens ?? 2048,
       },
+      tools: [{ googleSearch: {} }]
     });
 
     return {
@@ -80,6 +81,7 @@ ${JSON.stringify(schema, null, 2)}`;
         maxOutputTokens: options.maxTokens ?? 4096,
         responseMimeType: 'application/json',
       },
+      tools: [{ googleSearch: {} }]
     });
 
     const raw = response.text || '';
